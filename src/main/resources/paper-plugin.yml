@@ -1,0 +1,20 @@
+name: AuthSecurity
+version: '1.0'
+main: me.bedepay.authsecurity.AuthSecurity
+description: Forces authentication in the configuration phase before a player enters the world.
+author: bedepay
+api-version: '1.21'
+folia-supported: true
+permissions:
+  authsecurity.admin.unregister:
+    description: Allows running /unregister.
+    default: op
+  authsecurity.admin.changepassword:
+    description: Allows running /changepassword with target player.
+    default: op
+  authsecurity.admin.accountinfo:
+    description: Allows running /accountinfo.
+    default: op
+  authsecurity.changepassword:
+    description: Allows a player to change their own password via dialog.
+    default: true

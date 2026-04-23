@@ -1,0 +1,76 @@
+database:
+  # Accepted values: "h2" or "mariadb"
+  type: "h2"
+  h2:
+    file: "players"
+    options: "AUTO_SERVER=FALSE;MODE=MySQL"
+  mariadb:
+    host: "127.0.0.1"
+    port: 3306
+    database: "authsecurity"
+    username: "auth"
+    password: "change-me"
+    parameters: "useSSL=false&autoReconnect=true&characterEncoding=utf8"
+  pool:
+    maximum-pool-size: 8
+    minimum-idle: 2
+    connection-timeout-millis: 5000
+
+security:
+  max-attempts: 5
+  session-ttl-hours: 1
+  login-timeout-minutes: 3
+  password-min-length: 6
+  password-max-length: 72
+  # Maximum number of distinct accounts that may be connected concurrently from the same IP.
+  accounts-per-ip-limit: 3
+
+support:
+  # Shown to the player when they press "Forgot Password"
+  discord-url: "https://discord.gg/your-invite-here"
+
+messages:
+  login-title: "<gold>🔐 Login</gold>"
+  login-welcome: "<gray>Welcome back, <yellow><username></yellow>! Enter your password.</gray>"
+  login-button: "<green>Login</green>"
+  forgot-password-button: "<yellow>Forgot password?</yellow>"
+  register-title: "<aqua>📝 Register</aqua>"
+  register-welcome: "<gray>Hello <yellow><username></yellow>! Create a password.</gray>"
+  register-button: "<green>Register</green>"
+  cancel-button: "<red>Cancel</red>"
+  password-label: "<white>Password</white>"
+  password-confirm-label: "<white>Confirm password</white>"
+  wrong-password: "<red>Wrong password — <remaining> attempt(s) left.</red>"
+  too-many-attempts: "<red>Too many failed attempts.</red>"
+  login-cancelled: "<yellow>Login cancelled.</yellow>"
+  login-timed-out: "<yellow>Login timed out. Please reconnect.</yellow>"
+  internal-error: "<red>Internal server error.</red>"
+  password-empty: "<red>Password cannot be empty.</red>"
+  password-too-short: "<red>Password must be at least <min> characters.</red>"
+  password-too-long: "<red>Password must be at most <max> characters.</red>"
+  passwords-mismatch: "<red>Passwords do not match.</red>"
+  uuid-missing: "<red>Could not determine your UUID.</red>"
+  ip-limit-reached: "<red>Too many accounts connected from your IP address (limit: <limit>).</red>"
+
+  forgot-password-title: "<gold>🔑 Recover your account</gold>"
+  forgot-password-body: "<gray>Please open a ticket on our Discord server and a staff member will help you recover access to your account.\nOur team will verify your identity before any password is reset.</gray>"
+  forgot-password-discord-button: "<blue>Open Discord invite</blue>"
+  forgot-password-back-button: "<gray>Back</gray>"
+
+  change-password-title: "<gold>🔑 Change password</gold>"
+  change-password-body: "<gray>Enter your current password followed by the new one.</gray>"
+  change-password-old-label: "<white>Current password</white>"
+  change-password-new-label: "<white>New password</white>"
+  change-password-confirm-label: "<white>Confirm new password</white>"
+  change-password-button: "<green>Save</green>"
+  change-password-success: "<green>Your password has been updated.</green>"
+  change-password-wrong-old: "<red>Your current password is incorrect.</red>"
+
+  command-only-players: "<red>Only players can run this command.</red>"
+  command-not-authenticated: "<red>You are not logged in.</red>"
+  command-player-not-found: "<red>No account registered for '<player>'.</red>"
+  command-unregister-success: "<green>Account '<player>' has been removed.</green>"
+  command-changepassword-admin-success: "<green>Password for '<player>' has been updated.</green>"
+  command-accountinfo-header: "<gold>Account info for <player></gold>"
+  command-accountinfo-line: "<gray><key>:</gray> <white><value></white>"
+  command-no-permission: "<red>You do not have permission to use this command.</red>"
