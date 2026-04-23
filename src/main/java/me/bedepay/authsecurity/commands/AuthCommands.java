@@ -12,6 +12,7 @@ import me.bedepay.authsecurity.storage.AccountRepository;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,8 +21,13 @@ import org.bukkit.plugin.Plugin;
 import org.incendo.cloud.annotations.Argument;
 import org.incendo.cloud.annotations.Command;
 import org.incendo.cloud.annotations.Permission;
+import org.incendo.cloud.annotations.suggestion.Suggestions;
+import org.incendo.cloud.context.CommandContext;
+import org.incendo.cloud.context.CommandInput;
 
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,11 +39,14 @@ public final class AuthCommands implements Listener {
     public static final String PERM_ACCOUNT_INFO      = "authsecurity.admin.accountinfo";
     public static final String PERM_CHANGE_PASS       = "authsecurity.changepassword";
 
+    public static final String SUGGEST_PLAYERS = "authsecurity-players";
+
     private final Plugin plugin;
     private final AccountRepository accounts;
-    private final Messages messages;
-    private final Dialogs dialogs;
-    private final PluginConfig.SecurityConfig security;
+
+    private volatile Messages messages;
+    private volatile Dialogs dialogs;
+    private volatile PluginConfig.SecurityConfig security;
 
     /** Players who have an open /changepassword dialog. */
     private final ConcurrentHashMap<UUID, Boolean> openChangePassword = new ConcurrentHashMap<>();
@@ -54,13 +63,33 @@ public final class AuthCommands implements Listener {
         this.security = security;
     }
 
+    public void applyConfig(Messages messages, Dialogs dialogs, PluginConfig.SecurityConfig security) {
+        this.messages = messages;
+        this.dialogs = dialogs;
+        this.security = security;
+    }
+
+    // =========================================================================
+    // Tab suggestions
+    // =========================================================================
+
+    @Suggestions(SUGGEST_PLAYERS)
+    public List<String> suggestPlayers(CommandContext<CommandSourceStack> ctx, CommandInput input) {
+        String prefix = input.lastRemainingToken().toLowerCase(Locale.ROOT);
+        return Bukkit.getOnlinePlayers().stream()
+                .map(Player::getName)
+                .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(prefix))
+                .toList();
+    }
+
     // =========================================================================
     // /unregister <player>
     // =========================================================================
 
     @Command("unregister <player>")
     @Permission(PERM_UNREGISTER)
-    public void unregister(CommandSourceStack source, @Argument("player") String player) {
+    public void unregister(CommandSourceStack source,
+                           @Argument(value = "player", suggestions = SUGGEST_PLAYERS) String player) {
         Audience audience = source.getSender();
         try {
             Account account = accounts.findByUsername(player);
@@ -83,7 +112,7 @@ public final class AuthCommands implements Listener {
     @Command("changepassword <player> <newpass>")
     @Permission(PERM_CHANGE_PASS_ADMIN)
     public void changePasswordAdmin(CommandSourceStack source,
-                                    @Argument("player") String player,
+                                    @Argument(value = "player", suggestions = SUGGEST_PLAYERS) String player,
                                     @Argument("newpass") String newpass) {
         Audience audience = source.getSender();
         Component err = validatePassword(newpass, newpass);
@@ -127,7 +156,8 @@ public final class AuthCommands implements Listener {
 
     @Command("accountinfo <player>")
     @Permission(PERM_ACCOUNT_INFO)
-    public void accountInfo(CommandSourceStack source, @Argument("player") String player) {
+    public void accountInfo(CommandSourceStack source,
+                            @Argument(value = "player", suggestions = SUGGEST_PLAYERS) String player) {
         Audience audience = source.getSender();
         try {
             Account account = accounts.findByUsername(player);

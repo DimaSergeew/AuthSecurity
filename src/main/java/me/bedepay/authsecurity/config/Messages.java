@@ -61,7 +61,11 @@ public record Messages(
         String commandChangePasswordAdminSuccess,
         String commandAccountInfoHeader,
         String commandAccountInfoLine,
-        Component commandNoPermission
+        Component commandNoPermission,
+
+        Component commandReloadStarted,
+        Component commandReloadSuccess,
+        Component commandReloadFailed
 ) {
     private static final MiniMessage MM = MiniMessage.miniMessage();
 

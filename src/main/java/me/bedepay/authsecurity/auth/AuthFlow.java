@@ -31,10 +31,11 @@ public final class AuthFlow implements Listener {
 
     private final Plugin plugin;
     private final AccountRepository accounts;
-    private final PluginConfig.SecurityConfig security;
-    private final Messages messages;
-    private final Dialogs dialogs;
     private final ConnectionTracker connectionTracker;
+
+    private volatile PluginConfig.SecurityConfig security;
+    private volatile Messages messages;
+    private volatile Dialogs dialogs;
 
     private final Map<UUID, PendingSession> pending = new ConcurrentHashMap<>();
     private final Map<UUID, String> trustedSessions = new ConcurrentHashMap<>();
@@ -56,6 +57,12 @@ public final class AuthFlow implements Listener {
 
     public boolean isAuthenticated(UUID uuid) {
         return authenticated.getOrDefault(uuid, false);
+    }
+
+    public void applyConfig(PluginConfig.SecurityConfig security, Messages messages, Dialogs dialogs) {
+        this.security = security;
+        this.messages = messages;
+        this.dialogs = dialogs;
     }
 
     // =========================================================================

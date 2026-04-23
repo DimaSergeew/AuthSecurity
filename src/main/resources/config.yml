@@ -74,3 +74,7 @@ messages:
   command-accountinfo-header: "<gold>Account info for <player></gold>"
   command-accountinfo-line: "<gray><key>:</gray> <white><value></white>"
   command-no-permission: "<red>You do not have permission to use this command.</red>"
+
+  command-reload-started: "<gray>Reloading AuthSecurity configuration…</gray>"
+  command-reload-success: "<green>AuthSecurity configuration reloaded. Database settings require a server restart.</green>"
+  command-reload-failed: "<red>Reload failed — see server log.</red>"

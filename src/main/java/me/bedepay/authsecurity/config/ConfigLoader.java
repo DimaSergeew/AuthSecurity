@@ -142,7 +142,10 @@ public final class ConfigLoader {
                 s.getString("command-changepassword-admin-success", ""),
                 s.getString("command-accountinfo-header", ""),
                 s.getString("command-accountinfo-line", ""),
-                Messages.parse(s.getString("command-no-permission", ""))
+                Messages.parse(s.getString("command-no-permission", "")),
+                Messages.parse(s.getString("command-reload-started", "")),
+                Messages.parse(s.getString("command-reload-success", "")),
+                Messages.parse(s.getString("command-reload-failed", ""))
         );
     }
 }
