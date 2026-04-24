@@ -1,64 +1,70 @@
-# AuthSecurity
+<h1 align="center">🔐 AuthSecurity</h1>
 
-> Плагин авторизации для **Paper / Folia** серверов Minecraft, который заставляет игрока ввести пароль **до того, как он войдёт в мир**.
+<p align="center">
+  <b>Гейт авторизации для Paper / Folia прямо в <i>configuration phase</i></b><br>
+  <sub>Игрок не попадает в мир, пока не введёт пароль. Без лимба, без временных миров, без телепортов.</sub>
+</p>
 
-Плагин удерживает игрока на стадии **configuration phase** подключения с помощью `AsyncPlayerConnectionConfigureEvent`, показывает нативный диалог входа/регистрации и пропускает дальше только после успешной аутентификации. Никаких временных регионов, лимба или `teleport-to-spawn` костылей — игрок физически не загружается в мир, пока не авторизуется.
-
-![Java](https://img.shields.io/badge/Java-25-orange)
-![Paper](https://img.shields.io/badge/Paper_API-1.21.11-blue)
-![Folia](https://img.shields.io/badge/Folia-supported-brightgreen)
-
----
-
-## Возможности
-
-- 🔐 **Гейт в configuration phase** — игрок блокируется до логина нативно, без спавна в мир.
-- 🗄 **H2 и MariaDB** на выбор, пул соединений через **HikariCP**, подготовленные запросы хранятся в `.sql` ресурсах.
-- 🔑 **Argon2id** для хеширования паролей (`password4j`), параметры зафиксированы и не должны меняться без миграции хешей.
-- 🌐 **IP-лимит** — не более N одновременно подключённых аккаунтов с одного IP (настраивается).
-- ⏳ **Доверенные сессии** — повторный вход с того же IP в течение TTL пропускает диалог.
-- 💬 **Диалог «Забыли пароль?»** — встроенный (inline) диалог с инструкцией открыть тикет и кнопкой-ссылкой на Discord. Использует client-side `show_dialog` action.
-- ⚙ **Brigadier-команды** через Cloud annotations: `/unregister`, `/changepassword`, `/accountinfo`.
-- 🌸 **Folia-совместимый** — используются `AsyncScheduler` и корректно обрабатываются события подключения на регионах.
-- 📝 **Конфиг из рекордов** — все настройки и сообщения строго типизированы, сообщения в формате **MiniMessage**.
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-25-orange?logo=openjdk&logoColor=white" alt="Java 25">
+  <img src="https://img.shields.io/badge/Paper-1.21.11-blue?logo=minecraft&logoColor=white" alt="Paper 1.21.11">
+  <img src="https://img.shields.io/badge/Folia-supported-brightgreen" alt="Folia">
+  <img src="https://img.shields.io/badge/Argon2id-password4j-8A2BE2" alt="Argon2id">
+  <img src="https://img.shields.io/badge/DB-H2%20%2F%20MariaDB-lightgrey?logo=mariadb" alt="H2 / MariaDB">
+</p>
 
 ---
 
-## Установка
+## ✨ Возможности
 
-1. Скачайте `AuthSecurity.jar` из релизов (или соберите сами, см. ниже).
-2. Положите в папку `plugins/` вашего Paper/Folia сервера.
-3. Запустите сервер — при первом запуске будет создан `plugins/AuthSecurity/config.yml`.
-4. Отредактируйте конфиг (особенно `database.type`, `support.discord-url` и лимит IP).
-5. Перезапустите сервер.
-
-### Требования
-
-| Компонент | Версия |
-|-----------|--------|
-| Java      | **25** |
-| Paper API | **1.21.11** |
-| Folia     | поддерживается (`folia-supported: true`) |
+|   | Фича | Описание |
+|---|------|----------|
+| 🚪 | **Config-phase gate** | Блокировка в `AsyncPlayerConnectionConfigureEvent` — игрок физически не грузится в мир. |
+| 🔑 | **Argon2id** | `password4j`, 19 MiB / 2 iter / 16-byte salt. Параметры зафиксированы. |
+| 🗄 | **H2 / MariaDB** | HikariCP + prepared statements из `.sql` ресурсов. |
+| 🌐 | **IP-лимит** | Макс. N одновременных аккаунтов с одного IP. |
+| ⏳ | **Trusted sessions** | Повторный вход с того же IP в течение TTL — без диалога. |
+| 💬 | **Forgot password** | Inline-диалог с кнопкой-ссылкой на Discord. |
+| ⚙ | **Brigadier-команды** | Cloud annotations + нативное автодополнение. |
+| 🌸 | **Folia-ready** | `AsyncScheduler`, корректная обработка событий по регионам. |
+| 📝 | **MiniMessage** | Все сообщения строго типизированы (records). |
 
 ---
 
-## Сборка
+## 🚀 Установка
 
 ```bash
-./gradlew shadowJar
+# 1. Скачайте AuthSecurity.jar (Releases) или соберите:
+./gradlew shadowJar      # → build/libs/AuthSecurity.jar
+
+# 2. Скопируйте в plugins/, запустите сервер.
+# 3. Отредактируйте plugins/AuthSecurity/config.yml.
+# 4. Перезапустите.
 ```
 
-Готовый плагин окажется в `build/libs/AuthSecurity.jar`. Все зависимости (Hikari, H2, MariaDB JDBC, password4j, Cloud) затеняются под пакет `me.bedepay.authsecurity.libs`.
+**Требования:** Java **25** · Paper API **1.21.11** · Folia опционально.
 
 ---
 
-## Конфигурация
+## 🧭 Команды
 
-Файл `plugins/AuthSecurity/config.yml`:
+| Команда | Назначение | Право |
+|---------|------------|-------|
+| `/changepassword` | Смена своего пароля (диалогом). | `authsecurity.changepassword` *(all)* |
+| `/changepassword <player> <newpass>` | Принудительная смена пароля. | `authsecurity.admin.changepassword` *(op)* |
+| `/unregister <player>` | Удалить регистрацию. | `authsecurity.admin.unregister` *(op)* |
+| `/accountinfo <player>` | UUID, IP, даты создания/обновления. | `authsecurity.admin.accountinfo` *(op)* |
+
+---
+
+## ⚙️ Конфигурация
+
+<details>
+<summary><b>plugins/AuthSecurity/config.yml</b> — кликабельно</summary>
 
 ```yaml
 database:
-  type: "h2"          # "h2" или "mariadb"
+  type: "h2"            # "h2" | "mariadb"
   h2:
     file: "players"
     options: "AUTO_SERVER=FALSE;MODE=MySQL"
@@ -80,7 +86,7 @@ security:
   login-timeout-minutes: 3
   password-min-length: 6
   password-max-length: 72
-  accounts-per-ip-limit: 3      # ← лимит одновременных аккаунтов с одного IP
+  accounts-per-ip-limit: 3
 
 support:
   discord-url: "https://discord.gg/your-invite-here"
@@ -88,124 +94,110 @@ support:
 messages:
   login-title: "<gold>🔐 Login</gold>"
   login-welcome: "<gray>Welcome back, <yellow><username></yellow>!</gray>"
-  # ... полный список сообщений в MiniMessage
+  # ... остальные сообщения — MiniMessage
 ```
 
-Все сообщения поддерживают формат [**MiniMessage**](https://docs.advntr.dev/minimessage/format.html) и могут содержать плейсхолдеры вида `<username>`, `<remaining>`, `<limit>`, `<player>`, `<min>`, `<max>`.
+Плейсхолдеры: `<username>`, `<remaining>`, `<limit>`, `<player>`, `<min>`, `<max>`.
+Формат: [MiniMessage](https://docs.advntr.dev/minimessage/format.html).
+
+</details>
 
 ---
 
-## Команды и права
+## 🧩 Поток авторизации
 
-| Команда | Назначение | Право |
-|---------|------------|-------|
-| `/changepassword` | Открывает диалог смены своего пароля (нужен старый пароль). | `authsecurity.changepassword` *(по умолчанию: всем)* |
-| `/changepassword <player> <newpass>` | Принудительная смена пароля администратором. | `authsecurity.admin.changepassword` *(по умолчанию: op)* |
-| `/unregister <player>` | Удаляет регистрацию игрока. | `authsecurity.admin.unregister` *(по умолчанию: op)* |
-| `/accountinfo <player>` | Показывает UUID, последний IP, даты создания и обновления. | `authsecurity.admin.accountinfo` *(по умолчанию: op)* |
-
-Все команды зарегистрированы через Brigadier (Paper's `PaperCommandManager`) и имеют нативное автодополнение.
+```
+Player connects
+       │
+       ▼
+AsyncPlayerConnectionConfigureEvent  (async)
+       │
+   ┌───┼──────────────┬──────────────┐
+   ▼                  ▼              ▼
+IP trusted?      IP limit hit?   Account exists?
+  skip            disconnect     Login / Register
+                                       │
+                                       ▼
+                                 Show Dialog
+                                       │
+                                future().join()  ← блок до submit
+                                       │
+                            PlayerCustomClickEvent
+                                       │
+              ┌────────────────────────┼─────────────────┐
+              ▼                        ▼                 ▼
+           submit                   cancel        forgot-password
+              │                        │                 │
+              ▼                        ▼                 ▼
+        Argon2 verify             disconnect       inline dialog
+              │                                    (Discord URL)
+              ▼
+        complete(future) → player enters world
+```
 
 ---
 
-## Архитектура
+## 🏗 Архитектура
+
+<details>
+<summary><b>Дерево проекта</b></summary>
 
 ```
 src/main/java/me/bedepay/authsecurity
 ├── AuthSecurity.java              — entry point, wiring
 ├── auth/
-│   ├── AuthFlow.java              — config-phase gate + custom click handler
-│   ├── PendingSession.java        — record состояния ожидающей сессии
-│   ├── AuthResult.java            — record результата аутентификации
-│   └── PasswordHasher.java        — обёртка Argon2id
-├── commands/
-│   └── AuthCommands.java          — Cloud-аннотированные команды
+│   ├── AuthFlow.java              — config-phase gate + click handler
+│   ├── PendingSession.java        — record ожидающей сессии
+│   ├── AuthResult.java            — record результата
+│   └── PasswordHasher.java        — Argon2id wrapper
+├── commands/AuthCommands.java     — Cloud-аннотированные команды
 ├── config/
-│   ├── PluginConfig.java          — record всей конфигурации
-│   ├── Messages.java              — record всех сообщений (MiniMessage)
+│   ├── PluginConfig.java          — record конфига
+│   ├── Messages.java              — record сообщений (MiniMessage)
 │   └── ConfigLoader.java          — YAML → records
-├── dialog/
-│   └── Dialogs.java               — фабрика всех диалогов
-├── ip/
-│   └── ConnectionTracker.java     — учёт подключений по IP
+├── dialog/Dialogs.java            — фабрика диалогов
+├── ip/ConnectionTracker.java      — учёт подключений по IP
 └── storage/
     ├── Account.java               — record строки БД
-    ├── AccountRepository.java     — интерфейс хранилища
-    ├── HikariAccountRepository.java — реализация Hikari + H2/MariaDB
-    └── SqlBundle.java             — загружает .sql файлы из resources
+    ├── AccountRepository.java     — интерфейс
+    ├── HikariAccountRepository.java — реализация H2/MariaDB
+    └── SqlBundle.java             — загрузка .sql из resources
 
 src/main/resources
-├── config.yml                     — дефолтный конфиг
-├── paper-plugin.yml
-└── sql/
-    ├── h2/*.sql                   — запросы для H2
-    └── mariadb/*.sql              — запросы для MariaDB
+├── config.yml · paper-plugin.yml
+└── sql/{h2,mariadb}/*.sql
 ```
 
-### Ключевые инварианты
+</details>
 
-- **Нельзя удалять `future().join()`** в `AuthFlow.onConfigure` — это то, что удерживает игрока в configuration phase.
-- **`canCloseWithEscape(false)`** на диалогах входа/регистрации — иначе игрок может прорваться мимо.
-- **Параметры Argon2id (`19456 KiB, 2 iter, 1 thread, 32-byte, 16-byte salt`) менять нельзя** без миграции хешей.
-- **Все SQL — в ресурсах**, код оперирует только `PreparedStatement` и параметрами.
+### 🛑 Инварианты (не трогать)
+
+- **`future().join()`** в `AuthFlow.onConfigure` — именно он держит игрока в config-phase.
+- **`canCloseWithEscape(false)`** — иначе можно прорваться мимо диалога.
+- **Параметры Argon2id** менять нельзя без миграции хешей.
+- **SQL — только в ресурсах**, код работает через `PreparedStatement`.
 
 ---
 
-## Поток авторизации
-
-```
-             ┌────────────────────────┐
-             │ Player connects        │
-             └──────────┬─────────────┘
-                        │
-                        ▼
-   AsyncPlayerConnectionConfigureEvent (async)
-                        │
-        ┌───────────────┼────────────────┐
-        │               │                │
-        ▼               ▼                ▼
-  IP trusted?     IP limit hit?     Account exists?
-   skip dialog      disconnect      Login / Register
-                                         │
-                                         ▼
-                                   Show Dialog
-                                         │
-                                future().join()  ◄──── blocks event thread
-                                         │
-                          PlayerCustomClickEvent
-                                         │
-                 ┌───────────────────────┼────────────────┐
-                 ▼                       ▼                ▼
-              submit                  cancel          forgot-password
-               │                       │                  │
-               ▼                       ▼                  ▼
-         Argon2 verify            disconnect       inline dialog
-               │                                   (showDialog + Discord URL)
-               ▼
-         complete(future)  →  player enters world
-```
-
----
-
-## Разработка
-
-Проект использует **Gradle Kotlin DSL** и **Shadow 9.x**. Тесты отключены (`tasks.test { enabled = false }`) — плагин тестируется на реальном Paper/Folia сервере.
+## 🧪 Разработка
 
 ```bash
-./gradlew shadowJar        # собрать плагин
-./gradlew build            # compile + shadowJar
+./gradlew shadowJar        # сборка плагина
+./gradlew build            # compile + shadowJar   (тесты отключены)
 ```
 
-### Добавление новых сообщений
+<details>
+<summary><b>Добавить сообщение</b></summary>
 
-1. Добавьте поле в `Messages.java` (record).
-2. Добавьте парсинг в `ConfigLoader.readMessages`.
-3. Добавьте значение по умолчанию в `src/main/resources/config.yml`.
-4. Если нужны плейсхолдеры — добавьте метод-рендер в `Messages`.
+1. Поле в `Messages.java` (record).
+2. Парсинг в `ConfigLoader.readMessages`.
+3. Дефолт в `src/main/resources/config.yml`.
+4. При нужде — метод-рендер в `Messages`.
 
-### Добавление новой команды
+</details>
 
-Добавьте аннотированный метод в `AuthCommands.java`:
+<details>
+<summary><b>Добавить команду</b></summary>
 
 ```java
 @Command("mycommand <arg>")
@@ -213,25 +205,20 @@ src/main/resources
 public void myCommand(CommandSourceStack source, @Argument("arg") String arg) { ... }
 ```
 
-Парсер уже сканирует `AuthCommands` в `AuthSecurity#onEnable`.
+Парсер сканирует `AuthCommands` в `AuthSecurity#onEnable` автоматически.
+
+</details>
 
 ---
 
-## Безопасность
+## 🛡 Безопасность
 
-- Пароли хешируются **Argon2id** с memory cost 19 MiB, 2 итерации. Эти параметры выбраны как разумный компромисс между безопасностью и временем отклика диалога.
-- Пароли **никогда** не логируются и не пересылаются между узлами.
-- Команда `/changepassword <player> <pass>` всё равно оставляет пароль в истории команд — используйте её только для сервисных операций, а обычные игроки должны менять пароль диалогом.
-- Таблица `accounts` хранит только UUID, имя, хеш и технические поля. Никаких плейнтекст-паролей.
-
----
-
-## Лицензия
-
-TODO: добавьте лицензию по вкусу (MIT / Apache 2.0 / кастомная).
+- Пароли — **Argon2id**, никогда не логируются.
+- `/changepassword <player> <pass>` оставляет пароль в истории — только для сервисных задач.
+- Таблица `accounts`: UUID, username, hash, служебные поля. Никакого plaintext.
 
 ---
 
-## Автор
-
-**bedepay** · [GitHub](https://github.com/DimaSergeew)
+<p align="center">
+  <sub>© <b>bedepay</b> · <a href="https://github.com/DimaSergeew">GitHub</a> · Лицензия: <i>TODO (MIT / Apache 2.0)</i></sub>
+</p>
