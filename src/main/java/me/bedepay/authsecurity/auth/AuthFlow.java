@@ -5,6 +5,7 @@ import io.papermc.paper.connection.PlayerConfigurationConnection;
 import io.papermc.paper.dialog.DialogResponseView;
 import io.papermc.paper.event.connection.configuration.AsyncPlayerConnectionConfigureEvent;
 import io.papermc.paper.event.player.PlayerCustomClickEvent;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import me.bedepay.authsecurity.config.Messages;
 import me.bedepay.authsecurity.config.PluginConfig;
 import me.bedepay.authsecurity.dialog.Dialogs;
@@ -32,6 +33,7 @@ public final class AuthFlow implements Listener {
     private final Plugin plugin;
     private final AccountRepository accounts;
     private final ConnectionTracker connectionTracker;
+    private final LockoutTracker lockoutTracker;
 
     private volatile PluginConfig.SecurityConfig security;
     private volatile Messages messages;
@@ -39,6 +41,7 @@ public final class AuthFlow implements Listener {
 
     private final Map<UUID, PendingSession> pending = new ConcurrentHashMap<>();
     private final Map<UUID, String> trustedSessions = new ConcurrentHashMap<>();
+    private final Map<UUID, ScheduledTask> trustExpiryTasks = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
 
     public AuthFlow(Plugin plugin,
@@ -46,13 +49,15 @@ public final class AuthFlow implements Listener {
                     PluginConfig.SecurityConfig security,
                     Messages messages,
                     Dialogs dialogs,
-                    ConnectionTracker connectionTracker) {
+                    ConnectionTracker connectionTracker,
+                    LockoutTracker lockoutTracker) {
         this.plugin = plugin;
         this.accounts = accounts;
         this.security = security;
         this.messages = messages;
         this.dialogs = dialogs;
         this.connectionTracker = connectionTracker;
+        this.lockoutTracker = lockoutTracker;
     }
 
     public boolean isAuthenticated(UUID uuid) {
@@ -63,6 +68,17 @@ public final class AuthFlow implements Listener {
         this.security = security;
         this.messages = messages;
         this.dialogs = dialogs;
+    }
+
+    /**
+     * Drops any trusted IP session and authentication flag for {@code uuid}.
+     * Called on password change and on {@code /authsecurity logout}.
+     */
+    public void invalidate(UUID uuid) {
+        trustedSessions.remove(uuid);
+        authenticated.remove(uuid);
+        ScheduledTask task = trustExpiryTasks.remove(uuid);
+        if (task != null) task.cancel();
     }
 
     // =========================================================================
@@ -80,13 +96,20 @@ public final class AuthFlow implements Listener {
 
         String ip = extractIp(conn);
 
-        if (ip != null && ip.equals(trustedSessions.get(uuid))) {
+        if (security.sessionTrustEnabled() && ip != null && ip.equals(trustedSessions.get(uuid))) {
             authenticated.put(uuid, true);
             return;
         }
 
         if (!connectionTracker.tryAcquire(ip, uuid, security.accountsPerIpLimit())) {
             conn.disconnect(messages.ipLimitReached(security.accountsPerIpLimit()));
+            return;
+        }
+
+        long lockMinutes = lockoutTracker.remainingLockMinutes(uuid);
+        if (lockMinutes > 0) {
+            connectionTracker.release(ip, uuid);
+            conn.disconnect(messages.accountLocked(lockMinutes));
             return;
         }
 
@@ -99,6 +122,22 @@ public final class AuthFlow implements Listener {
             connectionTracker.release(ip, uuid);
             conn.disconnect(messages.internalError());
             return;
+        }
+
+        if (account == null && username != null) {
+            try {
+                Account byName = accounts.findByUsername(username);
+                if (byName != null) {
+                    connectionTracker.release(ip, uuid);
+                    conn.disconnect(messages.wrongUsernameCase(byName.username()));
+                    return;
+                }
+            } catch (SQLException e) {
+                plugin.getSLF4JLogger().error("DB error during username lookup for {}", username, e);
+                connectionTracker.release(ip, uuid);
+                conn.disconnect(messages.internalError());
+                return;
+            }
         }
 
         PendingSession session = account != null
@@ -122,16 +161,19 @@ public final class AuthFlow implements Listener {
 
         if (result.ok()) {
             authenticated.put(uuid, true);
-            if (ip != null) {
+            lockoutTracker.reset(uuid);
+            if (security.sessionTrustEnabled() && ip != null) {
                 trustedSessions.put(uuid, ip);
-                plugin.getServer().getAsyncScheduler().runDelayed(
-                        plugin, $ -> trustedSessions.remove(uuid),
-                        security.sessionTtlHours(), TimeUnit.HOURS);
+                scheduleTrustExpiry(uuid);
             }
             try {
                 accounts.updateLastIp(uuid, ip);
             } catch (SQLException e) {
                 plugin.getSLF4JLogger().warn("Failed to record last IP for {}", uuid, e);
+            }
+            if (session.isRegister()) {
+                plugin.getSLF4JLogger().info("Registered new account: {} ({}) from {}",
+                        session.username(), uuid, ip);
             }
         } else {
             connectionTracker.release(ip, uuid);
@@ -181,7 +223,7 @@ public final class AuthFlow implements Listener {
         }
 
         if (Dialogs.KEY_SUBMIT_LOGIN.equals(key)) {
-            handleLogin(session, audience, text(view, Dialogs.FIELD_PASSWORD));
+            handleLogin(uuid, session, audience, text(view, Dialogs.FIELD_PASSWORD));
         } else if (Dialogs.KEY_SUBMIT_REGISTER.equals(key)) {
             handleRegister(uuid, session, audience,
                     text(view, Dialogs.FIELD_PASSWORD),
@@ -193,9 +235,18 @@ public final class AuthFlow implements Listener {
     // Auth logic
     // =========================================================================
 
-    private void handleLogin(PendingSession session, Audience audience, String password) {
+    private void handleLogin(UUID uuid, PendingSession session, Audience audience, String password) {
         if (PasswordHasher.verify(password, session.hash())) {
             session.future().complete(AuthResult.allowed());
+            return;
+        }
+
+        boolean locked = lockoutTracker.recordFailure(uuid);
+        if (locked) {
+            long remaining = lockoutTracker.remainingLockMinutes(uuid);
+            plugin.getSLF4JLogger().info("Account locked after repeated failures: {} ({})",
+                    session.username(), uuid);
+            session.future().complete(AuthResult.denied(messages.accountLocked(remaining)));
             return;
         }
 
@@ -209,7 +260,7 @@ public final class AuthFlow implements Listener {
 
     private void handleRegister(UUID uuid, PendingSession session, Audience audience,
                                 String password, String confirm) {
-        Component error = validatePassword(password, confirm);
+        Component error = PasswordPolicy.validate(password, confirm, security, messages);
         if (error != null) {
             audience.showDialog(dialogs.register(session.username(), error));
             return;
@@ -226,17 +277,22 @@ public final class AuthFlow implements Listener {
         session.future().complete(AuthResult.allowed());
     }
 
-    private Component validatePassword(String pw, String confirm) {
-        if (pw == null || pw.isBlank()) return messages.passwordEmpty();
-        if (pw.length() < security.passwordMinLength()) return messages.passwordTooShort(security.passwordMinLength());
-        if (pw.length() > security.passwordMaxLength()) return messages.passwordTooLong(security.passwordMaxLength());
-        if (!pw.equals(confirm)) return messages.passwordsMismatch();
-        return null;
-    }
-
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    private void scheduleTrustExpiry(UUID uuid) {
+        ScheduledTask previous = trustExpiryTasks.remove(uuid);
+        if (previous != null) previous.cancel();
+
+        ScheduledTask task = plugin.getServer().getAsyncScheduler().runDelayed(
+                plugin, $ -> {
+                    trustedSessions.remove(uuid);
+                    trustExpiryTasks.remove(uuid);
+                },
+                security.sessionTtlMinutes(), TimeUnit.MINUTES);
+        trustExpiryTasks.put(uuid, task);
+    }
 
     private static String text(DialogResponseView view, String key) {
         if (view == null) return "";

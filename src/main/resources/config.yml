@@ -17,13 +17,33 @@ database:
     connection-timeout-millis: 5000
 
 security:
+  # Per-session wrong-password attempts before the player is kicked from the login dialog.
   max-attempts: 5
-  session-ttl-hours: 1
+  # IP-trusted session TTL. After a successful auth the player skips the dialog on reconnect
+  # from the same IP for this many minutes. Set to 0 to fully disable IP trust (always ask).
+  session-ttl-minutes: 60
+  # Time the player has to complete the login/register dialog before being kicked.
   login-timeout-minutes: 3
   password-min-length: 6
   password-max-length: 72
   # Maximum number of distinct accounts that may be connected concurrently from the same IP.
   accounts-per-ip-limit: 3
+
+  # Persistent account-level lockout. Survives reconnects — protects against brute force.
+  lockout:
+    enabled: true
+    max-attempts: 5
+    ban-minutes: 15
+
+  # Kick authenticated players who have been idle (no movement/chat/commands) for too long.
+  # They'll be asked to log in again on the next connect.
+  idle-logout:
+    enabled: false
+    minutes: 30
+
+  # Optional password complexity requirements (applied to registration and password change).
+  password-policy:
+    require-letter-and-digit: false
 
 support:
   # Shown to the player when they press "Forgot Password"
@@ -51,6 +71,10 @@ messages:
   passwords-mismatch: "<red>Passwords do not match.</red>"
   uuid-missing: "<red>Could not determine your UUID.</red>"
   ip-limit-reached: "<red>Too many accounts connected from your IP address (limit: <limit>).</red>"
+  account-locked: "<red>Too many failed attempts. Account locked for <minutes> minute(s).</red>"
+  wrong-username-case: "<red>Your registered name is '<correct>'. Please reconnect with the correct spelling.</red>"
+  idle-kick: "<yellow>Kicked for inactivity. Please log in again.</yellow>"
+  password-requires-alphanumeric: "<red>Password must contain at least one letter and one digit.</red>"
 
   forgot-password-title: "<gold>🔑 Recover your account</gold>"
   forgot-password-body: "<gray>Please open a ticket on our Discord server and a staff member will help you recover access to your account.\nOur team will verify your identity before any password is reset.</gray>"
@@ -74,6 +98,9 @@ messages:
   command-accountinfo-header: "<gold>Account info for <player></gold>"
   command-accountinfo-line: "<gray><key>:</gray> <white><value></white>"
   command-no-permission: "<red>You do not have permission to use this command.</red>"
+  command-logout-success: "<green>'<player>' has been logged out.</green>"
+  command-logout-not-online: "<yellow>'<player>' is not online. Trusted session cleared.</yellow>"
+  command-logout-kick: "<yellow>You have been logged out by an administrator.</yellow>"
 
   command-reload-started: "<gray>Reloading AuthSecurity configuration…</gray>"
   command-reload-success: "<green>AuthSecurity configuration reloaded. Database settings require a server restart.</green>"

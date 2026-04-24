@@ -21,3 +21,6 @@ permissions:
   authsecurity.admin.reload:
     description: Allows running /authsecurity reload.
     default: op
+  authsecurity.admin.logout:
+    description: Allows running /authsecurity logout.
+    default: op
