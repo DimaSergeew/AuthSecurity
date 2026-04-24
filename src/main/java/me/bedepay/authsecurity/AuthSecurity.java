@@ -2,6 +2,8 @@ package me.bedepay.authsecurity;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import me.bedepay.authsecurity.auth.AuthFlow;
+import me.bedepay.authsecurity.auth.IdleWatcher;
+import me.bedepay.authsecurity.auth.LockoutTracker;
 import me.bedepay.authsecurity.commands.AdminCommands;
 import me.bedepay.authsecurity.commands.AuthCommands;
 import me.bedepay.authsecurity.config.ConfigLoader;
@@ -22,6 +24,8 @@ public final class AuthSecurity extends JavaPlugin {
     private AuthFlow authFlow;
     private AuthCommands authCommands;
     private AdminCommands adminCommands;
+    private LockoutTracker lockoutTracker;
+    private IdleWatcher idleWatcher;
 
     @Override
     public void onEnable() {
@@ -38,15 +42,21 @@ public final class AuthSecurity extends JavaPlugin {
 
         Dialogs dialogs = new Dialogs(config.messages(), config.support());
         ConnectionTracker connectionTracker = new ConnectionTracker();
+        lockoutTracker = new LockoutTracker(config.security().lockout());
+        idleWatcher = new IdleWatcher(this, config.security().idleLogout(), config.messages());
 
         authFlow = new AuthFlow(
-                this, accounts, config.security(), config.messages(), dialogs, connectionTracker);
+                this, accounts, config.security(), config.messages(), dialogs,
+                connectionTracker, lockoutTracker);
         authCommands = new AuthCommands(
-                this, accounts, config.messages(), dialogs, config.security());
-        adminCommands = new AdminCommands(this, config.messages(), this::reload);
+                this, accounts, authFlow, config.messages(), dialogs, config.security());
+        adminCommands = new AdminCommands(
+                this, accounts, authFlow, config.messages(), this::reload);
 
         getServer().getPluginManager().registerEvents(authFlow, this);
         getServer().getPluginManager().registerEvents(authCommands, this);
+        getServer().getPluginManager().registerEvents(idleWatcher, this);
+        idleWatcher.start();
 
         PaperCommandManager<CommandSourceStack> commandManager = PaperCommandManager.builder()
                 .executionCoordinator(ExecutionCoordinator.asyncCoordinator())
@@ -60,20 +70,23 @@ public final class AuthSecurity extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (idleWatcher != null) idleWatcher.stop();
         if (accounts != null) accounts.close();
     }
 
     /**
      * Reloads the configuration from disk and swaps the live references held by
-     * {@link AuthFlow}, {@link AuthCommands} and {@link AdminCommands}. Database
-     * settings are NOT reloaded — changing them requires a full server restart
-     * because the Hikari pool owns open connections.
+     * {@link AuthFlow}, {@link AuthCommands}, {@link AdminCommands}, {@link LockoutTracker},
+     * and {@link IdleWatcher}. Database settings are NOT reloaded — changing them requires
+     * a full server restart because the Hikari pool owns open connections.
      */
     public void reload() {
         PluginConfig config = ConfigLoader.load(this);
         Dialogs dialogs = new Dialogs(config.messages(), config.support());
-        if (authFlow != null)     authFlow.applyConfig(config.security(), config.messages(), dialogs);
-        if (authCommands != null) authCommands.applyConfig(config.messages(), dialogs, config.security());
+        if (authFlow != null)      authFlow.applyConfig(config.security(), config.messages(), dialogs);
+        if (authCommands != null)  authCommands.applyConfig(config.messages(), dialogs, config.security());
         if (adminCommands != null) adminCommands.applyConfig(config.messages());
+        if (lockoutTracker != null) lockoutTracker.applyConfig(config.security().lockout());
+        if (idleWatcher != null)   idleWatcher.applyConfig(config.security().idleLogout(), config.messages());
     }
 }

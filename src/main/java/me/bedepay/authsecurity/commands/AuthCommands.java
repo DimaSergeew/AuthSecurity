@@ -3,7 +3,9 @@ package me.bedepay.authsecurity.commands;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.connection.PlayerGameConnection;
 import io.papermc.paper.event.player.PlayerCustomClickEvent;
+import me.bedepay.authsecurity.auth.AuthFlow;
 import me.bedepay.authsecurity.auth.PasswordHasher;
+import me.bedepay.authsecurity.auth.PasswordPolicy;
 import me.bedepay.authsecurity.config.Messages;
 import me.bedepay.authsecurity.config.PluginConfig;
 import me.bedepay.authsecurity.dialog.Dialogs;
@@ -43,6 +45,7 @@ public final class AuthCommands implements Listener {
 
     private final Plugin plugin;
     private final AccountRepository accounts;
+    private final AuthFlow authFlow;
 
     private volatile Messages messages;
     private volatile Dialogs dialogs;
@@ -53,11 +56,13 @@ public final class AuthCommands implements Listener {
 
     public AuthCommands(Plugin plugin,
                         AccountRepository accounts,
+                        AuthFlow authFlow,
                         Messages messages,
                         Dialogs dialogs,
                         PluginConfig.SecurityConfig security) {
         this.plugin = plugin;
         this.accounts = accounts;
+        this.authFlow = authFlow;
         this.messages = messages;
         this.dialogs = dialogs;
         this.security = security;
@@ -98,7 +103,10 @@ public final class AuthCommands implements Listener {
                 return;
             }
             accounts.delete(account.uuid());
+            authFlow.invalidate(account.uuid());
             audience.sendMessage(messages.commandUnregisterSuccess(account.username()));
+            plugin.getSLF4JLogger().info("Unregistered account: {} ({}), requester={}",
+                    account.username(), account.uuid(), source.getSender().getName());
         } catch (SQLException e) {
             plugin.getSLF4JLogger().error("/unregister {} failed", player, e);
             audience.sendMessage(messages.internalError());
@@ -115,7 +123,7 @@ public final class AuthCommands implements Listener {
                                     @Argument(value = "player", suggestions = SUGGEST_PLAYERS) String player,
                                     @Argument("newpass") String newpass) {
         Audience audience = source.getSender();
-        Component err = validatePassword(newpass, newpass);
+        Component err = PasswordPolicy.validate(newpass, newpass, security, messages);
         if (err != null) {
             audience.sendMessage(err);
             return;
@@ -127,7 +135,10 @@ public final class AuthCommands implements Listener {
                 return;
             }
             accounts.updateHash(account.uuid(), PasswordHasher.hash(newpass));
+            authFlow.invalidate(account.uuid());
             audience.sendMessage(messages.commandChangePasswordAdminSuccess(account.username()));
+            plugin.getSLF4JLogger().info("Admin changed password for {} ({}), requester={}",
+                    account.username(), account.uuid(), source.getSender().getName());
         } catch (SQLException e) {
             plugin.getSLF4JLogger().error("/changepassword {} failed", player, e);
             audience.sendMessage(messages.internalError());
@@ -216,12 +227,13 @@ public final class AuthCommands implements Listener {
                     audience.showDialog(dialogs.changePassword(messages.changePasswordWrongOld()));
                     return;
                 }
-                Component err = validatePassword(newPw, confirm);
+                Component err = PasswordPolicy.validate(newPw, confirm, security, messages);
                 if (err != null) {
                     audience.showDialog(dialogs.changePassword(err));
                     return;
                 }
                 accounts.updateHash(uuid, PasswordHasher.hash(newPw));
+                authFlow.invalidate(uuid);
                 openChangePassword.remove(uuid);
                 audience.closeDialog();
                 audience.sendMessage(messages.changePasswordSuccess());
@@ -231,14 +243,6 @@ public final class AuthCommands implements Listener {
                 audience.sendMessage(messages.internalError());
             }
         });
-    }
-
-    private Component validatePassword(String pw, String confirm) {
-        if (pw == null || pw.isBlank()) return messages.passwordEmpty();
-        if (pw.length() < security.passwordMinLength()) return messages.passwordTooShort(security.passwordMinLength());
-        if (pw.length() > security.passwordMaxLength()) return messages.passwordTooLong(security.passwordMaxLength());
-        if (!pw.equals(confirm)) return messages.passwordsMismatch();
-        return null;
     }
 
     private static String safe(Object value) {

@@ -86,13 +86,41 @@ public final class ConfigLoader {
     }
 
     private static PluginConfig.SecurityConfig readSecurity(ConfigurationSection s) {
+        long ttlMinutes = s.contains("session-ttl-minutes")
+                ? s.getLong("session-ttl-minutes", 60L)
+                : s.getLong("session-ttl-hours", 1L) * 60L;
+
+        ConfigurationSection lockoutSec = s.getConfigurationSection("lockout");
+        PluginConfig.LockoutConfig lockout = lockoutSec == null
+                ? new PluginConfig.LockoutConfig(true, 5, 15L)
+                : new PluginConfig.LockoutConfig(
+                        lockoutSec.getBoolean("enabled", true),
+                        lockoutSec.getInt("max-attempts", 5),
+                        lockoutSec.getLong("ban-minutes", 15L));
+
+        ConfigurationSection idleSec = s.getConfigurationSection("idle-logout");
+        PluginConfig.IdleLogoutConfig idle = idleSec == null
+                ? new PluginConfig.IdleLogoutConfig(false, 30L)
+                : new PluginConfig.IdleLogoutConfig(
+                        idleSec.getBoolean("enabled", false),
+                        idleSec.getLong("minutes", 30L));
+
+        ConfigurationSection policySec = s.getConfigurationSection("password-policy");
+        PluginConfig.PasswordPolicyConfig policy = policySec == null
+                ? new PluginConfig.PasswordPolicyConfig(false)
+                : new PluginConfig.PasswordPolicyConfig(
+                        policySec.getBoolean("require-letter-and-digit", false));
+
         return new PluginConfig.SecurityConfig(
                 s.getInt("max-attempts", 5),
-                s.getLong("session-ttl-hours", 1L),
+                ttlMinutes,
                 s.getLong("login-timeout-minutes", 3L),
                 s.getInt("password-min-length", 6),
                 s.getInt("password-max-length", 72),
-                s.getInt("accounts-per-ip-limit", 3)
+                s.getInt("accounts-per-ip-limit", 3),
+                lockout,
+                idle,
+                policy
         );
     }
 
@@ -123,6 +151,10 @@ public final class ConfigLoader {
                 Messages.parse(s.getString("passwords-mismatch", "")),
                 Messages.parse(s.getString("uuid-missing", "")),
                 s.getString("ip-limit-reached", ""),
+                s.getString("account-locked", ""),
+                s.getString("wrong-username-case", ""),
+                Messages.parse(s.getString("idle-kick", "")),
+                Messages.parse(s.getString("password-requires-alphanumeric", "")),
                 Messages.parse(s.getString("forgot-password-title", "")),
                 Messages.parse(s.getString("forgot-password-body", "")),
                 Messages.parse(s.getString("forgot-password-discord-button", "")),
@@ -143,6 +175,9 @@ public final class ConfigLoader {
                 s.getString("command-accountinfo-header", ""),
                 s.getString("command-accountinfo-line", ""),
                 Messages.parse(s.getString("command-no-permission", "")),
+                s.getString("command-logout-success", ""),
+                s.getString("command-logout-not-online", ""),
+                Messages.parse(s.getString("command-logout-kick", "")),
                 Messages.parse(s.getString("command-reload-started", "")),
                 Messages.parse(s.getString("command-reload-success", "")),
                 Messages.parse(s.getString("command-reload-failed", ""))

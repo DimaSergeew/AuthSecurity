@@ -40,6 +40,11 @@ public record Messages(
         Component uuidMissing,
         String ipLimitReached,
 
+        String accountLocked,
+        String wrongUsernameCase,
+        Component idleKick,
+        Component passwordRequiresAlphanumeric,
+
         Component forgotPasswordTitle,
         Component forgotPasswordBody,
         Component forgotPasswordDiscordButton,
@@ -62,6 +67,9 @@ public record Messages(
         String commandAccountInfoHeader,
         String commandAccountInfoLine,
         Component commandNoPermission,
+        String commandLogoutSuccess,
+        String commandLogoutNotOnline,
+        Component commandLogoutKick,
 
         Component commandReloadStarted,
         Component commandReloadSuccess,
@@ -99,6 +107,22 @@ public record Messages(
 
     public Component ipLimitReached(int limit) {
         return render(ipLimitReached, Placeholder.unparsed("limit", Integer.toString(limit)));
+    }
+
+    public Component accountLocked(long minutesRemaining) {
+        return render(accountLocked, Placeholder.unparsed("minutes", Long.toString(minutesRemaining)));
+    }
+
+    public Component wrongUsernameCase(String correctName) {
+        return render(wrongUsernameCase, Placeholder.unparsed("correct", correctName));
+    }
+
+    public Component commandLogoutSuccess(String player) {
+        return render(commandLogoutSuccess, Placeholder.unparsed("player", player));
+    }
+
+    public Component commandLogoutNotOnline(String player) {
+        return render(commandLogoutNotOnline, Placeholder.unparsed("player", player));
     }
 
     public Component commandPlayerNotFound(String player) {

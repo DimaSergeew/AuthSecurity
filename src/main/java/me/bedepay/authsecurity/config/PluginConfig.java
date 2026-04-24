@@ -34,11 +34,31 @@ public record PluginConfig(
 
     public record SecurityConfig(
             int maxAttempts,
-            long sessionTtlHours,
+            long sessionTtlMinutes,
             long loginTimeoutMinutes,
             int passwordMinLength,
             int passwordMaxLength,
-            int accountsPerIpLimit
+            int accountsPerIpLimit,
+            LockoutConfig lockout,
+            IdleLogoutConfig idleLogout,
+            PasswordPolicyConfig passwordPolicy
+    ) {
+        public boolean sessionTrustEnabled() { return sessionTtlMinutes > 0; }
+    }
+
+    public record LockoutConfig(
+            boolean enabled,
+            int maxAttempts,
+            long banMinutes
+    ) {}
+
+    public record IdleLogoutConfig(
+            boolean enabled,
+            long minutes
+    ) {}
+
+    public record PasswordPolicyConfig(
+            boolean requireLetterAndDigit
     ) {}
 
     public record SupportConfig(String discordUrl) {}
