@@ -2,25 +2,21 @@ package me.bedepay.authsecurity.auth;
 
 import me.bedepay.authsecurity.config.PluginConfig;
 
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Per-account brute-force lockout that survives reconnects.
- * Keyed by UUID — stable across the lifetime of a registered account.
+ * Per-IP brute-force lockout that survives reconnects within a server session.
+ * Keyed by IP address so an attacker cannot DoS a specific account by failing
+ * its password — only their own source IP gets blocked.
  *
- * <p>Failure counts reset automatically after a successful login via {@link #reset(UUID)},
- * or once the ban window elapses and the player retries.
+ * <p>Failure counts reset once the ban window elapses and the address retries.
  */
 public final class LockoutTracker {
 
-    private record Entry(AtomicInteger failures, long lockedUntilMillis) {
-        Entry withFailures(int count) { return new Entry(new AtomicInteger(count), lockedUntilMillis); }
-    }
+    private record Entry(int failures, long lockedUntilMillis) {}
 
-    private final ConcurrentHashMap<UUID, Entry> entries = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Entry> entries = new ConcurrentHashMap<>();
     private volatile PluginConfig.LockoutConfig config;
 
     public LockoutTracker(PluginConfig.LockoutConfig config) {
@@ -32,15 +28,15 @@ public final class LockoutTracker {
     }
 
     /**
-     * @return minutes remaining on an active lock, or {@code 0} if the account is not locked.
+     * @return minutes remaining on an active lock, or {@code 0} if the IP is not locked.
      */
-    public long remainingLockMinutes(UUID uuid) {
+    public long remainingLockMinutes(String ip) {
         if (!config.enabled()) return 0;
-        Entry entry = entries.get(uuid);
+        Entry entry = entries.get(ip);
         if (entry == null) return 0;
         long remainingMs = entry.lockedUntilMillis() - System.currentTimeMillis();
         if (remainingMs <= 0) {
-            entries.remove(uuid, entry);
+            entries.remove(ip, entry);
             return 0;
         }
         return Math.max(1, TimeUnit.MILLISECONDS.toMinutes(remainingMs));
@@ -49,25 +45,26 @@ public final class LockoutTracker {
     /**
      * Records a failed attempt. Returns {@code true} if this failure triggered a lock.
      */
-    public boolean recordFailure(UUID uuid) {
+    public boolean recordFailure(String ip) {
         if (!config.enabled()) return false;
         int max = Math.max(1, config.maxAttempts());
         long banMs = TimeUnit.MINUTES.toMillis(Math.max(1, config.banMinutes()));
 
-        Entry updated = entries.compute(uuid, (key, existing) -> {
-            if (existing == null) {
-                return new Entry(new AtomicInteger(1), 0L);
+        long now = System.currentTimeMillis();
+        Entry updated = entries.compute(ip, (key, existing) -> {
+            if (existing != null && existing.lockedUntilMillis() > now) {
+                return existing;
             }
-            int count = existing.failures().incrementAndGet();
+
+            int count = existing == null || existing.lockedUntilMillis() > 0
+                    ? 1
+                    : existing.failures() + 1;
             if (count >= max) {
-                return new Entry(new AtomicInteger(0), System.currentTimeMillis() + banMs);
+                return new Entry(0, now + banMs);
             }
-            return existing;
+            return new Entry(count, 0L);
         });
         return updated.lockedUntilMillis() > 0;
     }
 
-    public void reset(UUID uuid) {
-        entries.remove(uuid);
-    }
 }

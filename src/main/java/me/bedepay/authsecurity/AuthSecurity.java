@@ -59,7 +59,7 @@ public final class AuthSecurity extends JavaPlugin {
         idleWatcher.start();
 
         PaperCommandManager<CommandSourceStack> commandManager = PaperCommandManager.builder()
-                .executionCoordinator(ExecutionCoordinator.asyncCoordinator())
+                .executionCoordinator(ExecutionCoordinator.simpleCoordinator())
                 .buildOnEnable(this);
 
         AnnotationParser<CommandSourceStack> parser =

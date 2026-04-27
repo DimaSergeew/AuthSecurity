@@ -1,3 +1,2 @@
-MERGE INTO accounts (uuid, username, hash, last_ip, updated_at)
-KEY (uuid)
-VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+INSERT INTO accounts (uuid, username, username_key, hash, last_ip)
+VALUES (?, ?, ?, ?, ?)

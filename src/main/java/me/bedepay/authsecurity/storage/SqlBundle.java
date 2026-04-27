@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -20,6 +22,13 @@ public record SqlBundle(
         String updateLastIp,
         String deleteByUuid
 ) {
+    public List<String> schemaStatements() {
+        return Arrays.stream(schema.split(";"))
+                .map(String::trim)
+                .filter(statement -> !statement.isEmpty())
+                .toList();
+    }
+
     public static SqlBundle load(String dialect) {
         return new SqlBundle(
                 read(dialect, "schema.sql"),

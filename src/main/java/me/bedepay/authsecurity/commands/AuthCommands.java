@@ -212,37 +212,42 @@ public final class AuthCommands implements Listener {
         String newPw   = safeText(view.getText(Dialogs.FIELD_PASSWORD));
         String confirm = safeText(view.getText(Dialogs.FIELD_PASSWORD_CONFIRM));
 
-        Audience audience = player;
-
         // All blocking I/O (DB + Argon2) on the async scheduler.
         plugin.getServer().getAsyncScheduler().runNow(plugin, $ -> {
             try {
                 Account account = accounts.findByUuid(uuid);
                 if (account == null) {
                     openChangePassword.remove(uuid);
-                    audience.sendMessage(messages.internalError());
+                    runForPlayer(player, () -> player.sendMessage(messages.internalError()));
                     return;
                 }
                 if (!PasswordHasher.verify(oldPw, account.hash())) {
-                    audience.showDialog(dialogs.changePassword(messages.changePasswordWrongOld()));
+                    runForPlayer(player, () ->
+                            player.showDialog(dialogs.changePassword(messages.changePasswordWrongOld())));
                     return;
                 }
                 Component err = PasswordPolicy.validate(newPw, confirm, security, messages);
                 if (err != null) {
-                    audience.showDialog(dialogs.changePassword(err));
+                    runForPlayer(player, () -> player.showDialog(dialogs.changePassword(err)));
                     return;
                 }
                 accounts.updateHash(uuid, PasswordHasher.hash(newPw));
                 authFlow.invalidate(uuid);
                 openChangePassword.remove(uuid);
-                audience.closeDialog();
-                audience.sendMessage(messages.changePasswordSuccess());
+                runForPlayer(player, () -> {
+                    player.closeDialog();
+                    player.sendMessage(messages.changePasswordSuccess());
+                });
             } catch (SQLException e) {
                 openChangePassword.remove(uuid);
                 plugin.getSLF4JLogger().error("change-password failed for {}", uuid, e);
-                audience.sendMessage(messages.internalError());
+                runForPlayer(player, () -> player.sendMessage(messages.internalError()));
             }
         });
+    }
+
+    private void runForPlayer(Player player, Runnable action) {
+        player.getScheduler().run(plugin, $ -> action.run(), null);
     }
 
     private static String safe(Object value) {

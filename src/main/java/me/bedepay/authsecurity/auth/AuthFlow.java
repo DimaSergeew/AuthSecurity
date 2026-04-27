@@ -96,21 +96,23 @@ public final class AuthFlow implements Listener {
 
         String ip = extractIp(conn);
 
-        if (security.sessionTrustEnabled() && ip != null && ip.equals(trustedSessions.get(uuid))) {
-            authenticated.put(uuid, true);
-            return;
-        }
-
         if (!connectionTracker.tryAcquire(ip, uuid, security.accountsPerIpLimit())) {
             conn.disconnect(messages.ipLimitReached(security.accountsPerIpLimit()));
             return;
         }
 
-        long lockMinutes = lockoutTracker.remainingLockMinutes(uuid);
-        if (lockMinutes > 0) {
-            connectionTracker.release(ip, uuid);
-            conn.disconnect(messages.accountLocked(lockMinutes));
+        if (security.sessionTrustEnabled() && ip != null && ip.equals(trustedSessions.get(uuid))) {
+            authenticated.put(uuid, true);
             return;
+        }
+
+        if (ip != null) {
+            long lockMinutes = lockoutTracker.remainingLockMinutes(ip);
+            if (lockMinutes > 0) {
+                connectionTracker.release(ip, uuid);
+                conn.disconnect(messages.accountLocked(lockMinutes));
+                return;
+            }
         }
 
         String username = conn.getProfile().getName();
@@ -161,7 +163,6 @@ public final class AuthFlow implements Listener {
 
         if (result.ok()) {
             authenticated.put(uuid, true);
-            lockoutTracker.reset(uuid);
             if (security.sessionTrustEnabled() && ip != null) {
                 trustedSessions.put(uuid, ip);
                 scheduleTrustExpiry(uuid);
@@ -241,11 +242,11 @@ public final class AuthFlow implements Listener {
             return;
         }
 
-        boolean locked = lockoutTracker.recordFailure(uuid);
+        boolean locked = session.ip() != null && lockoutTracker.recordFailure(session.ip());
         if (locked) {
-            long remaining = lockoutTracker.remainingLockMinutes(uuid);
-            plugin.getSLF4JLogger().info("Account locked after repeated failures: {} ({})",
-                    session.username(), uuid);
+            long remaining = session.ip() != null ? lockoutTracker.remainingLockMinutes(session.ip()) : 0;
+            plugin.getSLF4JLogger().info("IP locked after repeated failures: {} ({}) from {}",
+                    session.username(), uuid, session.ip());
             session.future().complete(AuthResult.denied(messages.accountLocked(remaining)));
             return;
         }

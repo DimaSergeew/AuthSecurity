@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Locale;
 import java.util.UUID;
 
 public final class HikariAccountRepository implements AccountRepository {
@@ -59,7 +60,9 @@ public final class HikariAccountRepository implements AccountRepository {
     @Override
     public void initSchema() throws SQLException {
         try (Connection c = pool.getConnection(); Statement st = c.createStatement()) {
-            st.execute(sql.schema());
+            for (String statement : sql.schemaStatements()) {
+                st.execute(statement);
+            }
         }
     }
 
@@ -91,8 +94,9 @@ public final class HikariAccountRepository implements AccountRepository {
              PreparedStatement ps = c.prepareStatement(sql.upsert())) {
             ps.setString(1, uuid.toString());
             ps.setString(2, username);
-            ps.setString(3, hash);
-            ps.setString(4, lastIp);
+            ps.setString(3, usernameKey(username));
+            ps.setString(4, hash);
+            ps.setString(5, lastIp);
             ps.executeUpdate();
         }
     }
@@ -135,6 +139,10 @@ public final class HikariAccountRepository implements AccountRepository {
                 rs.getTimestamp("created_at"),
                 rs.getTimestamp("updated_at")
         );
+    }
+
+    private static String usernameKey(String username) {
+        return username == null ? null : username.toLowerCase(Locale.ROOT);
     }
 
     @Override

@@ -1,3 +1,3 @@
 SELECT uuid, username, hash, last_ip, created_at, updated_at
 FROM accounts
-WHERE LOWER(username) = LOWER(?)
+WHERE username_key = LOWER(?)
