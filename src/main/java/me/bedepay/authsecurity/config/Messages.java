@@ -42,6 +42,7 @@ public record Messages(
 
         String accountLocked,
         String wrongUsernameCase,
+        String nameAlreadyRegistered,
         Component idleKick,
         Component passwordRequiresAlphanumeric,
 
@@ -115,6 +116,10 @@ public record Messages(
 
     public Component wrongUsernameCase(String correctName) {
         return render(wrongUsernameCase, Placeholder.unparsed("correct", correctName));
+    }
+
+    public Component nameAlreadyRegistered(String name) {
+        return render(nameAlreadyRegistered, Placeholder.unparsed("name", name));
     }
 
     public Component commandLogoutSuccess(String player) {

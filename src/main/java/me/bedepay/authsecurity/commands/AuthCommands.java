@@ -19,6 +19,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.incendo.cloud.annotations.Argument;
 import org.incendo.cloud.annotations.Command;
@@ -157,6 +158,10 @@ public final class AuthCommands implements Listener {
             sender.sendMessage(messages.commandOnlyPlayers());
             return;
         }
+        if (!authFlow.isAuthenticated(player.getUniqueId())) {
+            player.sendMessage(messages.commandNotAuthenticated());
+            return;
+        }
         openChangePassword.put(player.getUniqueId(), Boolean.TRUE);
         player.showDialog(dialogs.changePassword(null));
     }
@@ -244,6 +249,11 @@ public final class AuthCommands implements Listener {
                 runForPlayer(player, () -> player.sendMessage(messages.internalError()));
             }
         });
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        openChangePassword.remove(event.getPlayer().getUniqueId());
     }
 
     private void runForPlayer(Player player, Runnable action) {

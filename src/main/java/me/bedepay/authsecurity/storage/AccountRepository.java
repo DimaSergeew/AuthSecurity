@@ -11,7 +11,7 @@ public interface AccountRepository extends AutoCloseable {
 
     Account findByUsername(String username) throws SQLException;
 
-    void upsert(UUID uuid, String username, String hash, String lastIp) throws SQLException;
+    void insert(UUID uuid, String username, String hash, String lastIp) throws SQLException;
 
     void updateHash(UUID uuid, String hash) throws SQLException;
 

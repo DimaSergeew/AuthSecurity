@@ -131,7 +131,14 @@ public final class AuthFlow implements Listener {
                 Account byName = accounts.findByUsername(username);
                 if (byName != null) {
                     connectionTracker.release(ip, uuid);
-                    conn.disconnect(messages.wrongUsernameCase(byName.username()));
+                    if (byName.username().equals(username)) {
+                        plugin.getSLF4JLogger().warn(
+                                "Name collision: '{}' is registered to UUID {} but {} connected with the same name",
+                                username, byName.uuid(), uuid);
+                        conn.disconnect(messages.nameAlreadyRegistered(byName.username()));
+                    } else {
+                        conn.disconnect(messages.wrongUsernameCase(byName.username()));
+                    }
                     return;
                 }
             } catch (SQLException e) {
@@ -269,7 +276,7 @@ public final class AuthFlow implements Listener {
 
         String hash = PasswordHasher.hash(password);
         try {
-            accounts.upsert(uuid, session.username(), hash, session.ip());
+            accounts.insert(uuid, session.username(), hash, session.ip());
         } catch (SQLException e) {
             plugin.getSLF4JLogger().error("DB error during registration for {}", uuid, e);
             session.future().complete(AuthResult.denied(messages.internalError()));

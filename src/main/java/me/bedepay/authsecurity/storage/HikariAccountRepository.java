@@ -89,9 +89,9 @@ public final class HikariAccountRepository implements AccountRepository {
     }
 
     @Override
-    public void upsert(UUID uuid, String username, String hash, String lastIp) throws SQLException {
+    public void insert(UUID uuid, String username, String hash, String lastIp) throws SQLException {
         try (Connection c = pool.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql.upsert())) {
+             PreparedStatement ps = c.prepareStatement(sql.insert())) {
             ps.setString(1, uuid.toString());
             ps.setString(2, username);
             ps.setString(3, usernameKey(username));

@@ -17,7 +17,7 @@ public record SqlBundle(
         String schema,
         String loadByUuid,
         String findByUsername,
-        String upsert,
+        String insert,
         String updateHash,
         String updateLastIp,
         String deleteByUuid
@@ -33,8 +33,8 @@ public record SqlBundle(
         return new SqlBundle(
                 read(dialect, "schema.sql"),
                 read(dialect, "load_by_uuid.sql"),
-                read(dialect, "find_uuid_by_name.sql"),
-                read(dialect, "upsert_account.sql"),
+                read(dialect, "find_by_username.sql"),
+                read(dialect, "insert_account.sql"),
                 read(dialect, "update_hash.sql"),
                 read(dialect, "update_last_ip.sql"),
                 read(dialect, "delete_by_uuid.sql")

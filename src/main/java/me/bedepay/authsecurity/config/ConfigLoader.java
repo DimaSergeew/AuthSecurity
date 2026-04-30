@@ -153,6 +153,7 @@ public final class ConfigLoader {
                 s.getString("ip-limit-reached", ""),
                 s.getString("account-locked", ""),
                 s.getString("wrong-username-case", ""),
+                s.getString("name-already-registered", ""),
                 Messages.parse(s.getString("idle-kick", "")),
                 Messages.parse(s.getString("password-requires-alphanumeric", "")),
                 Messages.parse(s.getString("forgot-password-title", "")),

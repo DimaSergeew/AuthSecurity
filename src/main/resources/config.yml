@@ -29,7 +29,9 @@ security:
   # Maximum number of distinct accounts that may be connected concurrently from the same IP.
   accounts-per-ip-limit: 3
 
-  # Persistent account-level lockout. Survives reconnects — protects against brute force.
+  # Persistent per-IP lockout. Counts wrong-password attempts by source address so an
+  # attacker can't lock out a victim's account by failing its password — only their
+  # own IP gets banned. Survives reconnects within a server session.
   lockout:
     enabled: true
     max-attempts: 5
@@ -73,6 +75,7 @@ messages:
   ip-limit-reached: "<red>Too many accounts connected from your IP address (limit: <limit>).</red>"
   account-locked: "<red>Too many failed attempts. Account locked for <minutes> minute(s).</red>"
   wrong-username-case: "<red>Your registered name is '<correct>'. Please reconnect with the correct spelling.</red>"
+  name-already-registered: "<red>The name '<name>' is already registered to a different account. Please contact a server administrator.</red>"
   idle-kick: "<yellow>Kicked for inactivity. Please log in again.</yellow>"
   password-requires-alphanumeric: "<red>Password must contain at least one letter and one digit.</red>"
 
