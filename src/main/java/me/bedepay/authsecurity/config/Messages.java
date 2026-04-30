@@ -1,6 +1,10 @@
 package me.bedepay.authsecurity.config;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
@@ -74,7 +78,15 @@ public record Messages(
 
         Component commandReloadStarted,
         Component commandReloadSuccess,
-        Component commandReloadFailed
+        Component commandReloadFailed,
+
+        Component captchaWelcomeTitle,
+        Component captchaRenewalTitle,
+        String captchaWelcomeBody,
+        String captchaRenewalBody,
+        Component captchaButtonDisconnect,
+        Component captchaIssueError,
+        Component captchaServerBusy
 ) {
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
@@ -150,5 +162,33 @@ public record Messages(
         return render(commandAccountInfoLine,
                 Placeholder.unparsed("key", key),
                 Placeholder.unparsed("value", value));
+    }
+
+    public Component captchaWelcomeBody(String username, String url) {
+        return render(captchaWelcomeBody,
+                Placeholder.unparsed("username", username == null ? "" : username),
+                Placeholder.component("url", clickableUrl(url)));
+    }
+
+    public Component captchaRenewalBody(String username, String url) {
+        return render(captchaRenewalBody,
+                Placeholder.unparsed("username", username == null ? "" : username),
+                Placeholder.component("url", clickableUrl(url)));
+    }
+
+    /**
+     * Builds a clickable link component for the captcha URL. Uses {@code openUrl}
+     * so a click sends the player straight to the verification page (after the
+     * Minecraft trust prompt). The dialog will get dismissed by the trust prompt,
+     * but that's fine: {@code CaptchaService.markVerified} fires a push callback
+     * the moment the captcha succeeds, which unblocks the configuration-phase gate
+     * and replaces the closed dialog with the register/login one.
+     */
+    private static Component clickableUrl(String url) {
+        return Component.text(url)
+                .color(NamedTextColor.AQUA)
+                .decorate(TextDecoration.UNDERLINED)
+                .clickEvent(ClickEvent.openUrl(url))
+                .hoverEvent(HoverEvent.showText(Component.text("Click to open in browser")));
     }
 }

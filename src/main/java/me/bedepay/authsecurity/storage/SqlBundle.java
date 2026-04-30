@@ -20,7 +20,12 @@ public record SqlBundle(
         String insert,
         String updateHash,
         String updateLastIp,
-        String deleteByUuid
+        String deleteByUuid,
+        String insertCaptchaToken,
+        String isCaptchaVerified,
+        String markCaptchaVerified,
+        String deleteExpiredCaptcha,
+        String touchCaptchaVerified
 ) {
     public List<String> schemaStatements() {
         return Arrays.stream(schema.split(";"))
@@ -37,7 +42,12 @@ public record SqlBundle(
                 read(dialect, "insert_account.sql"),
                 read(dialect, "update_hash.sql"),
                 read(dialect, "update_last_ip.sql"),
-                read(dialect, "delete_by_uuid.sql")
+                read(dialect, "delete_by_uuid.sql"),
+                read(dialect, "insert_captcha_token.sql"),
+                read(dialect, "is_captcha_verified.sql"),
+                read(dialect, "mark_captcha_verified.sql"),
+                read(dialect, "delete_expired_captcha.sql"),
+                read(dialect, "touch_captcha_verified.sql")
         );
     }
 

@@ -6,6 +6,7 @@ import io.papermc.paper.dialog.DialogResponseView;
 import io.papermc.paper.event.connection.configuration.AsyncPlayerConnectionConfigureEvent;
 import io.papermc.paper.event.player.PlayerCustomClickEvent;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import me.bedepay.authsecurity.captcha.CaptchaService;
 import me.bedepay.authsecurity.config.Messages;
 import me.bedepay.authsecurity.config.PluginConfig;
 import me.bedepay.authsecurity.dialog.Dialogs;
@@ -22,6 +23,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,8 +36,10 @@ public final class AuthFlow implements Listener {
     private final AccountRepository accounts;
     private final ConnectionTracker connectionTracker;
     private final LockoutTracker lockoutTracker;
+    private final CaptchaService captchaService;
 
     private volatile PluginConfig.SecurityConfig security;
+    private volatile PluginConfig.CaptchaConfig captchaConfig;
     private volatile Messages messages;
     private volatile Dialogs dialogs;
 
@@ -43,29 +47,39 @@ public final class AuthFlow implements Listener {
     private final Map<UUID, String> trustedSessions = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledTask> trustExpiryTasks = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicInteger captchaInflight =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     public AuthFlow(Plugin plugin,
                     AccountRepository accounts,
                     PluginConfig.SecurityConfig security,
+                    PluginConfig.CaptchaConfig captchaConfig,
                     Messages messages,
                     Dialogs dialogs,
                     ConnectionTracker connectionTracker,
-                    LockoutTracker lockoutTracker) {
+                    LockoutTracker lockoutTracker,
+                    CaptchaService captchaService) {
         this.plugin = plugin;
         this.accounts = accounts;
         this.security = security;
+        this.captchaConfig = captchaConfig;
         this.messages = messages;
         this.dialogs = dialogs;
         this.connectionTracker = connectionTracker;
         this.lockoutTracker = lockoutTracker;
+        this.captchaService = captchaService;
     }
 
     public boolean isAuthenticated(UUID uuid) {
         return authenticated.getOrDefault(uuid, false);
     }
 
-    public void applyConfig(PluginConfig.SecurityConfig security, Messages messages, Dialogs dialogs) {
+    public void applyConfig(PluginConfig.SecurityConfig security,
+                            PluginConfig.CaptchaConfig captchaConfig,
+                            Messages messages,
+                            Dialogs dialogs) {
         this.security = security;
+        this.captchaConfig = captchaConfig;
         this.messages = messages;
         this.dialogs = dialogs;
     }
@@ -149,6 +163,66 @@ public final class AuthFlow implements Listener {
             }
         }
 
+        // ---- Captcha gate (new players + returning players whose verification expired) ----
+        if (captchaConfig.enabled() && captchaRequired(account)) {
+            // Global cap on simultaneously-waiting captcha challenges. Each one holds
+            // a Paper async config-event thread for up to token-ttl-minutes, so without
+            // a ceiling a botnet could exhaust the pool and starve legitimate joins.
+            int max = captchaConfig.maxConcurrentChallenges();
+            if (max > 0 && captchaInflight.incrementAndGet() > max) {
+                captchaInflight.decrementAndGet();
+                connectionTracker.release(ip, uuid);
+                conn.disconnect(messages.captchaServerBusy());
+                return;
+            }
+            try {
+                boolean welcome = (account == null);
+                String token = captchaService.issueToken(uuid, username, ip);
+                if (token == null) {
+                    connectionTracker.release(ip, uuid);
+                    conn.disconnect(messages.captchaIssueError());
+                    return;
+                }
+                String url = buildCaptchaUrl(token);
+
+                PendingSession captchaSession = PendingSession.forCaptcha(username, ip, token, !welcome);
+                captchaSession.future().completeOnTimeout(
+                        AuthResult.denied(messages.loginTimedOut()),
+                        Math.max(1, captchaConfig.tokenTtlMinutes()),
+                        TimeUnit.MINUTES);
+                pending.put(uuid, captchaSession);
+
+                // Push-callback: when the player solves the Turnstile challenge in their
+                // browser, CaptchaService.markVerified fires this from the Javalin thread,
+                // which unblocks the future().join() below — the player doesn't have to
+                // click anything in Minecraft to continue.
+                captchaService.registerWaiter(token,
+                        () -> captchaSession.future().complete(AuthResult.allowed()));
+
+                conn.getAudience().showDialog(dialogs.captcha(url, username, welcome, null));
+
+                AuthResult captchaResult;
+                try {
+                    captchaResult = captchaSession.future().join();
+                } finally {
+                    pending.remove(uuid);
+                    captchaService.cancelWaiter(token);
+                }
+
+                if (!captchaResult.ok()) {
+                    connectionTracker.release(ip, uuid);
+                    conn.getAudience().closeDialog();
+                    conn.disconnect(captchaResult.disconnectReason());
+                    return;
+                }
+                // Captcha passed — close the captcha dialog so the next showDialog
+                // (login/register) opens cleanly on the client.
+                conn.getAudience().closeDialog();
+            } finally {
+                captchaInflight.decrementAndGet();
+            }
+        }
+
         PendingSession session = account != null
                 ? PendingSession.forLogin(account.username(), account.hash(), ip)
                 : PendingSession.forRegister(username, ip);
@@ -178,6 +252,13 @@ public final class AuthFlow implements Listener {
                 accounts.updateLastIp(uuid, ip);
             } catch (SQLException e) {
                 plugin.getSLF4JLogger().warn("Failed to record last IP for {}", uuid, e);
+            }
+            if (captchaConfig.enabled()) {
+                try {
+                    accounts.touchCaptchaVerifiedAt(uuid);
+                } catch (SQLException e) {
+                    plugin.getSLF4JLogger().warn("Failed to record captcha_verified_at for {}", uuid, e);
+                }
             }
             if (session.isRegister()) {
                 plugin.getSLF4JLogger().info("Registered new account: {} ({}) from {}",
@@ -288,6 +369,23 @@ public final class AuthFlow implements Listener {
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    private boolean captchaRequired(Account account) {
+        if (account == null) return true;
+        int validityDays = captchaConfig.verificationValidityDays();
+        if (validityDays <= 0) return true;
+        Timestamp ts = account.captchaVerifiedAt();
+        if (ts == null) return true;
+        long ageMillis = System.currentTimeMillis() - ts.getTime();
+        return ageMillis > TimeUnit.DAYS.toMillis(validityDays);
+    }
+
+    private String buildCaptchaUrl(String token) {
+        String base = captchaConfig.publicBaseUrl();
+        if (base == null || base.isBlank()) base = "http://127.0.0.1:" + captchaConfig.webPort();
+        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base + "/c/" + token;
+    }
 
     private void scheduleTrustExpiry(UUID uuid) {
         ScheduledTask previous = trustExpiryTasks.remove(uuid);

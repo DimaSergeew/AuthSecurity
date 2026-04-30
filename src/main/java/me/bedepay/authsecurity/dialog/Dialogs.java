@@ -95,6 +95,35 @@ public final class Dialogs {
                 .type(DialogType.multiAction(buttons).build()));
     }
 
+    /**
+     * Captcha gate dialog. Shown to new players (welcome=true) before registration,
+     * and to returning players whose captcha verification has expired (welcome=false).
+     *
+     * <p>The verification URL is rendered as a clickable link inside the dialog body
+     * (clicking copies it to the clipboard — does not open a browser, to avoid the
+     * Minecraft trust prompt that would dismiss this dialog and leave the configuration
+     * gate without any UI). When the player completes the Turnstile challenge in the
+     * browser, {@code CaptchaService.markVerified} fires the registered push callback
+     * which unblocks the gate — this dialog closes automatically and the next dialog
+     * (login or register) replaces it. The only button is "Disconnect", so the player
+     * can bail out at any moment.
+     */
+    public Dialog captcha(String url, String username, boolean welcome, Component error) {
+        Component body = welcome
+                ? m.captchaWelcomeBody(username, url)
+                : m.captchaRenewalBody(username, url);
+        Component title = welcome ? m.captchaWelcomeTitle() : m.captchaRenewalTitle();
+        List<ActionButton> buttons = List.of(
+                customButton(m.captchaButtonDisconnect(), KEY_CANCEL)
+        );
+        return Dialog.create(f -> f.empty()
+                .base(DialogBase.builder(title)
+                        .canCloseWithEscape(false)
+                        .body(body(body, error))
+                        .build())
+                .type(DialogType.multiAction(buttons).build()));
+    }
+
     public Dialog changePassword(Component error) {
         List<ActionButton> buttons = List.of(
                 customButton(m.changePasswordButton(), KEY_SUBMIT_CHANGEPWD),

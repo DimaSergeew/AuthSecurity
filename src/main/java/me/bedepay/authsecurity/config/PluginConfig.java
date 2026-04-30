@@ -4,6 +4,7 @@ public record PluginConfig(
         DatabaseConfig database,
         SecurityConfig security,
         SupportConfig support,
+        CaptchaConfig captcha,
         Messages messages
 ) {
     public record DatabaseConfig(
@@ -62,4 +63,36 @@ public record PluginConfig(
     ) {}
 
     public record SupportConfig(String discordUrl) {}
+
+    public record CaptchaConfig(
+            boolean enabled,
+            String siteKey,
+            String secretKey,
+            int webPort,
+            String publicBaseUrl,
+            int tokenTtlMinutes,
+            int verificationValidityDays,
+            int maxConcurrentChallenges,
+            CaptchaWebTexts webTexts
+    ) {}
+
+    /**
+     * User-facing strings rendered into the Turnstile widget HTML page.
+     * Plain text (not MiniMessage). Multi-line values use real newlines.
+     */
+    public record CaptchaWebTexts(
+            String lang,
+            String title,
+            String brand,
+            String tagline,
+            String heading,
+            String intro,
+            String hint,
+            String footer,
+            String statusVerifying,
+            String statusVerified,
+            String statusFailed,
+            String statusNetwork,
+            String statusWidgetError
+    ) {}
 }

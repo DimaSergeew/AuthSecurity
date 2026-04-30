@@ -51,6 +51,63 @@ support:
   # Shown to the player when they press "Forgot Password"
   discord-url: "https://discord.gg/your-invite-here"
 
+# Web-CAPTCHA gate (Cloudflare Turnstile) for new and stale players.
+# When enabled, the plugin starts an embedded HTTP server that hosts a Turnstile widget.
+# Get your keys at https://dash.cloudflare.com → Turnstile.
+# enabled, web-port and public-base-url require a full server restart to take effect
+# (the embedded HTTP server is created once on startup, like the database pool).
+captcha:
+  enabled: false
+  # Public site key — embedded into the HTML page.
+  site-key: "YOUR_SITE_KEY"
+  # Private secret — used server-side to verify the Turnstile response.
+  secret-key: "YOUR_SECRET_KEY"
+  # Port for the embedded HTTP server. Must be open in your firewall.
+  web-port: 25590
+  # Public URL the player will see in the dialog. Use https:// if you have nginx + TLS in front.
+  # Example: "http://your-vps-ip:25590" or "https://captcha.example.com"
+  public-base-url: "http://127.0.0.1:25590"
+  # How long a single verification link stays usable. Should be ≤ login-timeout-minutes above.
+  token-ttl-minutes: 10
+  # How long a successful captcha is remembered for that account. After this many days the
+  # player will be asked to pass captcha again on next connect. Set 0 to require it every time.
+  verification-validity-days: 7
+  # Hard cap on how many captcha challenges can be open at the same time. Each waiting
+  # session occupies one Paper async config-thread for up to token-ttl-minutes, so this
+  # is the main defence against a botnet trying to exhaust your thread pool. Set to 0
+  # to disable the limit (not recommended on a public server).
+  max-concurrent-challenges: 50
+
+  # Texts rendered into the captcha web page (https://<your-host>/c/<token>).
+  # Plain text (NOT MiniMessage). Use YAML block scalar "|-" for multi-line
+  # status messages — real newlines become line breaks on the page.
+  # To translate the page, just override the strings below.
+  web-texts:
+    lang: "en"
+    title: "PinkyFoxy — Anti-bot Verification"
+    brand: "PINKY FOXY"
+    tagline: "~ Anti-bot Verification ~"
+    heading: "Prove you are not a bot"
+    intro: |-
+      Complete the check below to enter the server.
+      When it succeeds you can close this tab — Minecraft will continue automatically.
+    hint: "If the widget doesn't load, make sure JavaScript is enabled and Cloudflare is reachable."
+    footer: "© PinkyFoxy · Powered by Cloudflare Turnstile"
+    status-verifying: "Verifying..."
+    status-verified: |-
+      VERIFIED!
+      You can close this tab and return to Minecraft.
+      The login screen will appear automatically.
+    status-failed: |-
+      Verification failed.
+      Please try again.
+    status-network: |-
+      Network error.
+      Check your connection and try again.
+    status-widget-error: |-
+      Captcha widget error.
+      Please refresh the page.
+
 messages:
   login-title: "<gold>🔐 Login</gold>"
   login-welcome: "<gray>Welcome back, <yellow><username></yellow>! Enter your password.</gray>"
@@ -108,3 +165,15 @@ messages:
   command-reload-started: "<gray>Reloading AuthSecurity configuration…</gray>"
   command-reload-success: "<green>AuthSecurity configuration reloaded. Database settings require a server restart.</green>"
   command-reload-failed: "<red>Reload failed — see server log.</red>"
+
+  captcha-welcome-title: "<gold>🛡 Anti-bot verification</gold>"
+  captcha-renewal-title: "<gold>🛡 Verification required</gold>"
+  # Body shown to brand-new players. The <url> placeholder renders as a clickable link
+  # that copies the URL to the player's clipboard. The dialog auto-closes the moment
+  # Cloudflare confirms the captcha, and registration appears immediately afterwards —
+  # the player does NOT need to come back into Minecraft and click anything.
+  captcha-welcome-body: "<gray>Welcome, <yellow><username></yellow>!\n\nThis is your <yellow>first time</yellow> joining this server. To protect us from bots, please complete a quick <green>one-time anti-bot check</green>.\n\n<white>Click the link below — it will open the verification page in your browser:</white>\n\n  <url>\n\n<gray>As soon as you finish the captcha, you'll <green>automatically continue</green> to registration. No need to come back and click anything.</gray>"
+  captcha-renewal-body: "<gray>Hey <yellow><username></yellow>! Your previous verification has expired and we need to confirm you're still a human.\n\n<white>Click the link below — it will open the verification page in your browser:</white>\n\n  <url>\n\n<gray>You'll <green>automatically continue</green> the moment the check succeeds.</gray>"
+  captcha-button-disconnect: "<red>Disconnect</red>"
+  captcha-issue-error: "<red>Failed to issue a verification link. Please reconnect.</red>"
+  captcha-server-busy: "<red>The verification queue is full right now. Please try again in a minute.</red>"

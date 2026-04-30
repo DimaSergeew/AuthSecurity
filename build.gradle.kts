@@ -26,6 +26,10 @@ dependencies {
     implementation("com.zaxxer:HikariCP:6.3.0")
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.6")
     implementation("com.h2database:h2:2.3.232")
+
+    implementation("io.javalin:javalin:6.4.0") {
+        exclude(group = "org.slf4j", module = "slf4j-api")
+    }
 }
 
 java {
@@ -51,4 +55,8 @@ tasks.shadowJar {
     relocate("org.mariadb", "$base.mariadb")
     relocate("org.incendo.cloud", "$base.cloud")
     relocate("io.leangen.geantyref", "$base.geantyref")
+    relocate("io.javalin", "$base.javalin")
+    relocate("org.eclipse.jetty", "$base.jetty")
+    relocate("kotlin", "$base.kotlin")
+    relocate("jakarta.servlet", "$base.jakarta.servlet")
 }

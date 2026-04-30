@@ -19,6 +19,16 @@ public interface AccountRepository extends AutoCloseable {
 
     boolean delete(UUID uuid) throws SQLException;
 
+    void insertCaptchaToken(String token, UUID uuid, String username, String ip, long ttlSeconds) throws SQLException;
+
+    boolean isCaptchaVerified(String token) throws SQLException;
+
+    boolean markCaptchaVerified(String token) throws SQLException;
+
+    int deleteExpiredCaptchaTokens() throws SQLException;
+
+    void touchCaptchaVerifiedAt(UUID uuid) throws SQLException;
+
     @Override
     void close();
 }

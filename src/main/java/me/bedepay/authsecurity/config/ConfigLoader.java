@@ -40,6 +40,7 @@ public final class ConfigLoader {
                 readDatabase(section(yml, "database")),
                 readSecurity(section(yml, "security")),
                 readSupport(section(yml, "support")),
+                readCaptcha(yml.getConfigurationSection("captcha")),
                 readMessages(section(yml, "messages"))
         );
     }
@@ -128,6 +129,61 @@ public final class ConfigLoader {
         return new PluginConfig.SupportConfig(s.getString("discord-url", ""));
     }
 
+    private static PluginConfig.CaptchaConfig readCaptcha(ConfigurationSection s) {
+        if (s == null) {
+            return new PluginConfig.CaptchaConfig(false, "", "", 25590, "", 10, 7, 50, defaultWebTexts());
+        }
+        return new PluginConfig.CaptchaConfig(
+                s.getBoolean("enabled", false),
+                s.getString("site-key", ""),
+                s.getString("secret-key", ""),
+                s.getInt("web-port", 25590),
+                s.getString("public-base-url", ""),
+                s.getInt("token-ttl-minutes", 10),
+                s.getInt("verification-validity-days", 7),
+                s.getInt("max-concurrent-challenges", 50),
+                readWebTexts(s.getConfigurationSection("web-texts"))
+        );
+    }
+
+    private static PluginConfig.CaptchaWebTexts defaultWebTexts() {
+        return new PluginConfig.CaptchaWebTexts(
+                "en",
+                "PinkyFoxy — Anti-bot Verification",
+                "PINKY FOXY",
+                "~ Anti-bot Verification ~",
+                "Prove you are not a bot",
+                "Complete the check below to enter the server.\nWhen it succeeds you can close this tab — Minecraft will continue automatically.",
+                "If the widget doesn't load, make sure JavaScript is enabled and Cloudflare is reachable.",
+                "© PinkyFoxy · Powered by Cloudflare Turnstile",
+                "Verifying...",
+                "VERIFIED!\nYou can close this tab and return to Minecraft.\nThe login screen will appear automatically.",
+                "Verification failed.\nPlease try again.",
+                "Network error.\nCheck your connection and try again.",
+                "Captcha widget error.\nPlease refresh the page."
+        );
+    }
+
+    private static PluginConfig.CaptchaWebTexts readWebTexts(ConfigurationSection s) {
+        PluginConfig.CaptchaWebTexts d = defaultWebTexts();
+        if (s == null) return d;
+        return new PluginConfig.CaptchaWebTexts(
+                s.getString("lang", d.lang()),
+                s.getString("title", d.title()),
+                s.getString("brand", d.brand()),
+                s.getString("tagline", d.tagline()),
+                s.getString("heading", d.heading()),
+                s.getString("intro", d.intro()),
+                s.getString("hint", d.hint()),
+                s.getString("footer", d.footer()),
+                s.getString("status-verifying", d.statusVerifying()),
+                s.getString("status-verified", d.statusVerified()),
+                s.getString("status-failed", d.statusFailed()),
+                s.getString("status-network", d.statusNetwork()),
+                s.getString("status-widget-error", d.statusWidgetError())
+        );
+    }
+
     private static Messages readMessages(ConfigurationSection s) {
         return new Messages(
                 Messages.parse(s.getString("login-title", "")),
@@ -181,7 +237,15 @@ public final class ConfigLoader {
                 Messages.parse(s.getString("command-logout-kick", "")),
                 Messages.parse(s.getString("command-reload-started", "")),
                 Messages.parse(s.getString("command-reload-success", "")),
-                Messages.parse(s.getString("command-reload-failed", ""))
+                Messages.parse(s.getString("command-reload-failed", "")),
+
+                Messages.parse(s.getString("captcha-welcome-title", "")),
+                Messages.parse(s.getString("captcha-renewal-title", "")),
+                s.getString("captcha-welcome-body", ""),
+                s.getString("captcha-renewal-body", ""),
+                Messages.parse(s.getString("captcha-button-disconnect", "")),
+                Messages.parse(s.getString("captcha-issue-error", "")),
+                Messages.parse(s.getString("captcha-server-busy", ""))
         );
     }
 }

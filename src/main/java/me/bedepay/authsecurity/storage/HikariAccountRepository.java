@@ -137,8 +137,59 @@ public final class HikariAccountRepository implements AccountRepository {
                 rs.getString("hash"),
                 rs.getString("last_ip"),
                 rs.getTimestamp("created_at"),
-                rs.getTimestamp("updated_at")
+                rs.getTimestamp("updated_at"),
+                rs.getTimestamp("captcha_verified_at")
         );
+    }
+
+    @Override
+    public void insertCaptchaToken(String token, UUID uuid, String username, String ip, long ttlSeconds) throws SQLException {
+        try (Connection c = pool.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql.insertCaptchaToken())) {
+            ps.setString(1, token);
+            ps.setString(2, uuid.toString());
+            ps.setString(3, username);
+            ps.setString(4, ip);
+            ps.setLong(5, ttlSeconds);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public boolean isCaptchaVerified(String token) throws SQLException {
+        try (Connection c = pool.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql.isCaptchaVerified())) {
+            ps.setString(1, token);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
+        }
+    }
+
+    @Override
+    public boolean markCaptchaVerified(String token) throws SQLException {
+        try (Connection c = pool.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql.markCaptchaVerified())) {
+            ps.setString(1, token);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public int deleteExpiredCaptchaTokens() throws SQLException {
+        try (Connection c = pool.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql.deleteExpiredCaptcha())) {
+            return ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void touchCaptchaVerifiedAt(UUID uuid) throws SQLException {
+        try (Connection c = pool.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql.touchCaptchaVerified())) {
+            ps.setString(1, uuid.toString());
+            ps.executeUpdate();
+        }
     }
 
     private static String usernameKey(String username) {

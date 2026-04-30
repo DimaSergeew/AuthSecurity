@@ -4,6 +4,8 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import me.bedepay.authsecurity.auth.AuthFlow;
 import me.bedepay.authsecurity.auth.IdleWatcher;
 import me.bedepay.authsecurity.auth.LockoutTracker;
+import me.bedepay.authsecurity.captcha.CaptchaService;
+import me.bedepay.authsecurity.captcha.CaptchaWebServer;
 import me.bedepay.authsecurity.commands.AdminCommands;
 import me.bedepay.authsecurity.commands.AuthCommands;
 import me.bedepay.authsecurity.config.ConfigLoader;
@@ -26,6 +28,8 @@ public final class AuthSecurity extends JavaPlugin {
     private AdminCommands adminCommands;
     private LockoutTracker lockoutTracker;
     private IdleWatcher idleWatcher;
+    private CaptchaService captchaService;
+    private CaptchaWebServer captchaWebServer;
 
     @Override
     public void onEnable() {
@@ -45,9 +49,22 @@ public final class AuthSecurity extends JavaPlugin {
         lockoutTracker = new LockoutTracker(config.security().lockout());
         idleWatcher = new IdleWatcher(this, config.security().idleLogout(), config.messages());
 
+        captchaService = new CaptchaService(this, accounts, config.captcha());
+        if (config.captcha().enabled()) {
+            try {
+                captchaWebServer = new CaptchaWebServer(this, captchaService);
+                captchaWebServer.start();
+                captchaService.startCleanup();
+            } catch (Exception e) {
+                getSLF4JLogger().error("Failed to start captcha web server — captcha will be disabled this session", e);
+                captchaWebServer = null;
+            }
+        }
+
         authFlow = new AuthFlow(
-                this, accounts, config.security(), config.messages(), dialogs,
-                connectionTracker, lockoutTracker);
+                this, accounts, config.security(), config.captcha(),
+                config.messages(), dialogs,
+                connectionTracker, lockoutTracker, captchaService);
         authCommands = new AuthCommands(
                 this, accounts, authFlow, config.messages(), dialogs, config.security());
         adminCommands = new AdminCommands(
@@ -71,22 +88,26 @@ public final class AuthSecurity extends JavaPlugin {
     @Override
     public void onDisable() {
         if (idleWatcher != null) idleWatcher.stop();
+        if (captchaService != null) captchaService.stop();
+        if (captchaWebServer != null) captchaWebServer.stop();
         if (accounts != null) accounts.close();
     }
 
     /**
      * Reloads the configuration from disk and swaps the live references held by
      * {@link AuthFlow}, {@link AuthCommands}, {@link AdminCommands}, {@link LockoutTracker},
-     * and {@link IdleWatcher}. Database settings are NOT reloaded — changing them requires
-     * a full server restart because the Hikari pool owns open connections.
+     * and {@link IdleWatcher}. Database settings and the captcha web server are NOT reloaded —
+     * changing those requires a full server restart because they own long-lived resources
+     * (connection pool, listening port).
      */
     public void reload() {
         PluginConfig config = ConfigLoader.load(this);
         Dialogs dialogs = new Dialogs(config.messages(), config.support());
-        if (authFlow != null)      authFlow.applyConfig(config.security(), config.messages(), dialogs);
+        if (authFlow != null)      authFlow.applyConfig(config.security(), config.captcha(), config.messages(), dialogs);
         if (authCommands != null)  authCommands.applyConfig(config.messages(), dialogs, config.security());
         if (adminCommands != null) adminCommands.applyConfig(config.messages());
         if (lockoutTracker != null) lockoutTracker.applyConfig(config.security().lockout());
         if (idleWatcher != null)   idleWatcher.applyConfig(config.security().idleLogout(), config.messages());
+        if (captchaService != null) captchaService.applyConfig(config.captcha());
     }
 }

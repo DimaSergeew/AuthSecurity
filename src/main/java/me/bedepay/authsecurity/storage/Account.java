@@ -9,5 +9,6 @@ public record Account(
         String hash,
         String lastIp,
         Timestamp createdAt,
-        Timestamp updatedAt
+        Timestamp updatedAt,
+        Timestamp captchaVerifiedAt
 ) {}
