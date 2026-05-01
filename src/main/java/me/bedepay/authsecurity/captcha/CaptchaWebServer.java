@@ -62,10 +62,6 @@ public final class CaptchaWebServer {
             ctx.status(HttpStatus.BAD_REQUEST).result("Invalid token");
             return;
         }
-        if (!tokenLooksAlive(token)) {
-            ctx.status(HttpStatus.GONE).result("This verification link has expired or was already used.");
-            return;
-        }
         String siteKey = captcha.config().siteKey();
         PluginConfig.CaptchaWebTexts t = captcha.config().webTexts();
         String html = htmlTemplate
@@ -102,14 +98,6 @@ public final class CaptchaWebServer {
         } else {
             ctx.status(HttpStatus.BAD_REQUEST).result("verification failed");
         }
-    }
-
-    private boolean tokenLooksAlive(String token) {
-        // We accept the token if it isn't already verified or expired in the DB.
-        // We don't have a "is alive" query, but isCaptchaVerified returns false for
-        // expired or unknown tokens too — that's OK here: we still serve the page,
-        // the actual verification will fail later if the token is bad.
-        return true;
     }
 
     private static String jsonField(String body, String name) {
