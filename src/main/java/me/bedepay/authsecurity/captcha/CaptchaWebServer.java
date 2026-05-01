@@ -35,6 +35,9 @@ public final class CaptchaWebServer {
             cfg.showJavalinBanner = false;
             cfg.useVirtualThreads = false;
             cfg.jetty.defaultHost = "0.0.0.0";
+            cfg.requestLogger.http((ctx, ms) -> plugin.getSLF4JLogger().info(
+                    "captcha-web {} \"{} {}\" {} {}ms",
+                    ctx.ip(), ctx.method(), ctx.path(), ctx.status().getCode(), ms.longValue()));
         });
         app.get("/", ctx -> ctx.result("AuthSecurity captcha gate OK"));
         app.get("/c/{token}", this::serveWidget);
