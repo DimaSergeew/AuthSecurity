@@ -267,6 +267,9 @@ public final class AuthFlow implements Listener {
             if (session.isRegister()) {
                 plugin.getSLF4JLogger().info("Registered new account: {} ({}) from {}",
                         session.username(), uuid, ip);
+            } else {
+                plugin.getSLF4JLogger().info("Login: {} ({}) from {}",
+                        session.username(), uuid, ip);
             }
         } else {
             connectionTracker.release(ip, uuid);
@@ -343,7 +346,10 @@ public final class AuthFlow implements Listener {
             return;
         }
 
-        int remaining = security.maxAttempts() - session.attempts().incrementAndGet();
+        int attempts = session.attempts().incrementAndGet();
+        int remaining = security.maxAttempts() - attempts;
+        plugin.getSLF4JLogger().info("Failed login: {} ({}) from {}, attempts={}/{}",
+                session.username(), uuid, session.ip(), attempts, security.maxAttempts());
         if (remaining <= 0) {
             session.future().complete(AuthResult.denied(messages.tooManyAttempts()));
             return;
