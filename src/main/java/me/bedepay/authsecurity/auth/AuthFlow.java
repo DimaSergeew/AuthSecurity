@@ -169,7 +169,11 @@ public final class AuthFlow implements Listener {
             // a Paper async config-event thread for up to token-ttl-minutes, so without
             // a ceiling a botnet could exhaust the pool and starve legitimate joins.
             int max = captchaConfig.maxConcurrentChallenges();
-            if (max > 0 && captchaInflight.incrementAndGet() > max) {
+            // When the cap is disabled (max <= 0) we skip the inflight counter entirely,
+            // otherwise the unconditional decrement in finally would drive it negative
+            // and silently raise the cap after a later reload that re-enables the limit.
+            boolean tracked = max > 0;
+            if (tracked && captchaInflight.incrementAndGet() > max) {
                 captchaInflight.decrementAndGet();
                 connectionTracker.release(ip, uuid);
                 conn.disconnect(messages.captchaServerBusy());
@@ -219,7 +223,7 @@ public final class AuthFlow implements Listener {
                 // (login/register) opens cleanly on the client.
                 conn.getAudience().closeDialog();
             } finally {
-                captchaInflight.decrementAndGet();
+                if (tracked) captchaInflight.decrementAndGet();
             }
         }
 
