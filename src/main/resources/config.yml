@@ -62,6 +62,11 @@ captcha:
   site-key: "YOUR_SITE_KEY"
   # Private secret — used server-side to verify the Turnstile response.
   secret-key: "YOUR_SECRET_KEY"
+  # Interface the embedded HTTP server binds to. Use "127.0.0.1" when you put
+  # nginx (or another reverse proxy) in front and want the captcha port to be
+  # unreachable from the public internet. Use "0.0.0.0" to listen on every
+  # interface (only safe if the port is firewalled to trusted sources).
+  web-bind: "0.0.0.0"
   # Port for the embedded HTTP server. Must be open in your firewall.
   web-port: 25590
   # Public URL the player will see in the dialog. Use https:// if you have nginx + TLS in front.

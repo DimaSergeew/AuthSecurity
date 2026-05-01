@@ -68,6 +68,7 @@ public record PluginConfig(
             boolean enabled,
             String siteKey,
             String secretKey,
+            String webBind,
             int webPort,
             String publicBaseUrl,
             int tokenTtlMinutes,

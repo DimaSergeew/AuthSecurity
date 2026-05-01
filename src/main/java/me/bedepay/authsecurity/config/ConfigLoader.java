@@ -131,12 +131,13 @@ public final class ConfigLoader {
 
     private static PluginConfig.CaptchaConfig readCaptcha(ConfigurationSection s) {
         if (s == null) {
-            return new PluginConfig.CaptchaConfig(false, "", "", 25590, "", 10, 7, 50, defaultWebTexts());
+            return new PluginConfig.CaptchaConfig(false, "", "", "0.0.0.0", 25590, "", 10, 7, 50, defaultWebTexts());
         }
         return new PluginConfig.CaptchaConfig(
                 s.getBoolean("enabled", false),
                 s.getString("site-key", ""),
                 s.getString("secret-key", ""),
+                s.getString("web-bind", "0.0.0.0"),
                 s.getInt("web-port", 25590),
                 s.getString("public-base-url", ""),
                 s.getInt("token-ttl-minutes", 10),

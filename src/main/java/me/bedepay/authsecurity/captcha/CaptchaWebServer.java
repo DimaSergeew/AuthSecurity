@@ -31,10 +31,13 @@ public final class CaptchaWebServer {
     }
 
     public void start() {
+        String bind = captcha.config().webBind();
+        if (bind == null || bind.isBlank()) bind = "0.0.0.0";
+        final String bindHost = bind;
         app = Javalin.create(cfg -> {
             cfg.showJavalinBanner = false;
             cfg.useVirtualThreads = false;
-            cfg.jetty.defaultHost = "0.0.0.0";
+            cfg.jetty.defaultHost = bindHost;
             cfg.requestLogger.http((ctx, ms) -> plugin.getSLF4JLogger().info(
                     "captcha-web {} \"{} {}\" {} {}ms",
                     ctx.ip(), ctx.method(), ctx.path(), ctx.status().getCode(), ms.longValue()));
@@ -43,7 +46,7 @@ public final class CaptchaWebServer {
         app.get("/c/{token}", this::serveWidget);
         app.post("/verify", this::handleVerify);
         app.start(captcha.config().webPort());
-        plugin.getSLF4JLogger().info("Captcha web server listening on port {}", captcha.config().webPort());
+        plugin.getSLF4JLogger().info("Captcha web server listening on {}:{}", bindHost, captcha.config().webPort());
     }
 
     public void stop() {
