@@ -12,7 +12,7 @@ database:
     password: "change-me"
     parameters: "useSSL=false&autoReconnect=true&characterEncoding=utf8"
   pool:
-    maximum-pool-size: 8
+    maximum-pool-size: 16
     minimum-idle: 2
     connection-timeout-millis: 5000
 
