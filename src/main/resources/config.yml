@@ -58,10 +58,15 @@ support:
 # (the embedded HTTP server is created once on startup, like the database pool).
 captcha:
   enabled: false
+  # Defaults below are Cloudflare's official "always pass" Turnstile test keys —
+  # https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+  # They make the captcha auto-succeed everywhere, useful for local end-to-end
+  # testing after code changes. REPLACE BOTH with real keys before going to
+  # production, otherwise your captcha gate is effectively disabled.
   # Public site key — embedded into the HTML page.
-  site-key: "YOUR_SITE_KEY"
+  site-key: "1x00000000000000000000AA"
   # Private secret — used server-side to verify the Turnstile response.
-  secret-key: "YOUR_SECRET_KEY"
+  secret-key: "1x0000000000000000000000000000000AA"
   # Interface the embedded HTTP server binds to. Use "127.0.0.1" when you put
   # nginx (or another reverse proxy) in front and want the captcha port to be
   # unreachable from the public internet. Use "0.0.0.0" to listen on every
