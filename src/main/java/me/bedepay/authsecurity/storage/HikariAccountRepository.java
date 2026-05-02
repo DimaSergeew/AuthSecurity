@@ -138,7 +138,8 @@ public final class HikariAccountRepository implements AccountRepository {
                 rs.getString("last_ip"),
                 rs.getTimestamp("created_at"),
                 rs.getTimestamp("updated_at"),
-                rs.getTimestamp("captcha_verified_at")
+                rs.getTimestamp("captcha_verified_at"),
+                rs.getString("captcha_verified_ip")
         );
     }
 
@@ -184,10 +185,11 @@ public final class HikariAccountRepository implements AccountRepository {
     }
 
     @Override
-    public void touchCaptchaVerifiedAt(UUID uuid) throws SQLException {
+    public void touchCaptchaVerifiedAt(UUID uuid, String ip) throws SQLException {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.touchCaptchaVerified())) {
-            ps.setString(1, uuid.toString());
+            ps.setString(1, ip);
+            ps.setString(2, uuid.toString());
             ps.executeUpdate();
         }
     }

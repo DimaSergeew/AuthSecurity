@@ -10,5 +10,6 @@ public record Account(
         String lastIp,
         Timestamp createdAt,
         Timestamp updatedAt,
-        Timestamp captchaVerifiedAt
+        Timestamp captchaVerifiedAt,
+        String captchaVerifiedIp
 ) {}

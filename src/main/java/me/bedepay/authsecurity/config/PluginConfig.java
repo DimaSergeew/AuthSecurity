@@ -73,6 +73,7 @@ public record PluginConfig(
             String publicBaseUrl,
             int tokenTtlMinutes,
             int verificationValidityDays,
+            boolean revalidateOnIpChange,
             int maxConcurrentChallenges,
             CaptchaWebTexts webTexts
     ) {}

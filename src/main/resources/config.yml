@@ -77,6 +77,11 @@ captcha:
   # How long a successful captcha is remembered for that account. After this many days the
   # player will be asked to pass captcha again on next connect. Set 0 to require it every time.
   verification-validity-days: 7
+  # Re-prompt the captcha when the player's IP differs from the one used during the
+  # last successful verification. Helps against session hijacks / cookie theft scenarios
+  # where an attacker reuses an authenticated UUID from a different network. Disable for
+  # audiences on mobile / dynamic ISPs where IPs change frequently.
+  revalidate-on-ip-change: true
   # Hard cap on how many captcha challenges can be open at the same time. Each waiting
   # session occupies one Paper async config-thread for up to token-ttl-minutes, so this
   # is the main defence against a botnet trying to exhaust your thread pool. Set to 0
@@ -173,12 +178,17 @@ messages:
 
   captcha-welcome-title: "<gold>🛡 Anti-bot verification</gold>"
   captcha-renewal-title: "<gold>🛡 Verification required</gold>"
-  # Body shown to brand-new players. The <url> placeholder renders as a clickable link
-  # that copies the URL to the player's clipboard. The dialog auto-closes the moment
-  # Cloudflare confirms the captcha, and registration appears immediately afterwards —
-  # the player does NOT need to come back into Minecraft and click anything.
-  captcha-welcome-body: "<gray>Welcome, <yellow><username></yellow>!\n\nThis is your <yellow>first time</yellow> joining this server. To protect us from bots, please complete a quick <green>one-time anti-bot check</green>.\n\n<white>Click the link below — it will open the verification page in your browser:</white>\n\n  <url>\n\n<gray>As soon as you finish the captcha, you'll <green>automatically continue</green> to registration. No need to come back and click anything.</gray>"
-  captcha-renewal-body: "<gray>Hey <yellow><username></yellow>! Your previous verification has expired and we need to confirm you're still a human.\n\n<white>Click the link below — it will open the verification page in your browser:</white>\n\n  <url>\n\n<gray>You'll <green>automatically continue</green> the moment the check succeeds.</gray>"
+  # Captcha dialog body. The verification URL is exposed via the "Open captcha" button
+  # below — do NOT inline it as <url> in the body, the dialog will compress long links
+  # and look ugly. The dialog auto-closes the moment Cloudflare confirms the captcha,
+  # and registration / login appears immediately afterwards — the player does NOT need
+  # to come back into Minecraft and click anything.
+  # Note about regional restrictions: Cloudflare's verification endpoint is unreachable
+  # from a few regions due to sanctions; in that case players need a VPN.
+  captcha-welcome-body: "<gray>Welcome, <yellow><username></yellow>!\n\nThis is your <yellow>first time</yellow> on this server. To protect us from bots, please complete a quick <green>one-time anti-bot check</green>.\n\n<white>Press <yellow>Open captcha</yellow> below — the verification page will open in your browser. You'll <green>automatically return</green> to registration the moment the check succeeds — no need to click anything in Minecraft.</white>\n\n<gray><italic>Heads up: in some regions Cloudflare's check is blocked due to sanctions. If the page does not load, please use a <yellow>VPN</yellow>. If anything else goes wrong — press <yellow>Discord help</yellow> and our team will sort it out.</italic></gray>"
+  captcha-renewal-body: "<gray>Hey <yellow><username></yellow>! Your previous verification has expired (or you're connecting from a new IP), so we need to confirm you're still a human.\n\n<white>Press <yellow>Open captcha</yellow> below — the verification page will open in your browser. You'll <green>automatically continue</green> the moment the check succeeds.</white>\n\n<gray><italic>Heads up: in some regions Cloudflare's check is blocked due to sanctions. If the page does not load, please use a <yellow>VPN</yellow>. If you need help, press <yellow>Discord help</yellow>.</italic></gray>"
+  captcha-button-open: "<green>Open captcha</green>"
+  captcha-button-discord: "<aqua>Discord help</aqua>"
   captcha-button-disconnect: "<red>Disconnect</red>"
   captcha-issue-error: "<red>Failed to issue a verification link. Please reconnect.</red>"
   captcha-server-busy: "<red>The verification queue is full right now. Please try again in a minute.</red>"

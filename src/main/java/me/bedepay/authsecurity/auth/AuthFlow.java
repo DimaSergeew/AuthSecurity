@@ -164,7 +164,7 @@ public final class AuthFlow implements Listener {
         }
 
         // ---- Captcha gate (new players + returning players whose verification expired) ----
-        if (captchaConfig.enabled() && captchaRequired(account)) {
+        if (captchaConfig.enabled() && captchaRequired(account, ip)) {
             // Global cap on simultaneously-waiting captcha challenges. Each one holds
             // a Paper async config-event thread for up to token-ttl-minutes, so without
             // a ceiling a botnet could exhaust the pool and starve legitimate joins.
@@ -259,7 +259,7 @@ public final class AuthFlow implements Listener {
             }
             if (captchaConfig.enabled()) {
                 try {
-                    accounts.touchCaptchaVerifiedAt(uuid);
+                    accounts.touchCaptchaVerifiedAt(uuid, ip);
                 } catch (SQLException e) {
                     plugin.getSLF4JLogger().warn("Failed to record captcha_verified_at for {}", uuid, e);
                 }
@@ -376,18 +376,22 @@ public final class AuthFlow implements Listener {
         session.future().complete(AuthResult.allowed());
     }
 
-    // =========================================================================
-    // Helpers
-    // =========================================================================
-
-    private boolean captchaRequired(Account account) {
+    private boolean captchaRequired(Account account, String ip) {
         if (account == null) return true;
         int validityDays = captchaConfig.verificationValidityDays();
         if (validityDays <= 0) return true;
         Timestamp ts = account.captchaVerifiedAt();
         if (ts == null) return true;
         long ageMillis = System.currentTimeMillis() - ts.getTime();
-        return ageMillis > TimeUnit.DAYS.toMillis(validityDays);
+        if (ageMillis > TimeUnit.DAYS.toMillis(validityDays)) return true;
+        if (captchaConfig.revalidateOnIpChange()) {
+            String verifiedIp = account.captchaVerifiedIp();
+            // No recorded verification IP (legacy account verified before this column existed) —
+            // re-prompt once, the next success will fill it in.
+            if (verifiedIp == null || verifiedIp.isBlank()) return true;
+            if (ip == null || !verifiedIp.equals(ip)) return true;
+        }
+        return false;
     }
 
     private String buildCaptchaUrl(String token) {

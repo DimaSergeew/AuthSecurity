@@ -6,10 +6,12 @@ CREATE TABLE IF NOT EXISTS accounts (
     last_ip             VARCHAR(64),
     created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    captcha_verified_at TIMESTAMP    NULL
+    captcha_verified_at TIMESTAMP    NULL,
+    captcha_verified_ip VARCHAR(64)  NULL
 );
 
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS captcha_verified_at TIMESTAMP NULL;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS captcha_verified_ip VARCHAR(64) NULL;
 
 CREATE TABLE IF NOT EXISTS captcha_tokens (
     token       VARCHAR(64) NOT NULL PRIMARY KEY,

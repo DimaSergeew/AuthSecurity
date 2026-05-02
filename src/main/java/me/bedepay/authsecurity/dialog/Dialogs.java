@@ -97,25 +97,38 @@ public final class Dialogs {
 
     /**
      * Captcha gate dialog. Shown to new players (welcome=true) before registration,
-     * and to returning players whose captcha verification has expired (welcome=false).
+     * and to returning players whose captcha verification has expired or whose IP
+     * has changed (welcome=false).
      *
-     * <p>The verification URL is rendered as a clickable link inside the dialog body
-     * (clicking copies it to the clipboard — does not open a browser, to avoid the
-     * Minecraft trust prompt that would dismiss this dialog and leave the configuration
-     * gate without any UI). When the player completes the Turnstile challenge in the
-     * browser, {@code CaptchaService.markVerified} fires the registered push callback
-     * which unblocks the gate — this dialog closes automatically and the next dialog
-     * (login or register) replaces it. The only button is "Disconnect", so the player
-     * can bail out at any moment.
+     * <p>The verification URL is exposed as an action button ({@code Open captcha}).
+     * Clicking opens the page in the browser (after Minecraft's trust prompt) — the
+     * dialog gets dismissed, but that's fine: when the player completes the Turnstile
+     * challenge, {@code CaptchaService.markVerified} fires the registered push callback
+     * which unblocks the configuration-phase gate, and the next dialog (login or
+     * register) is sent automatically.
+     *
+     * <p>A Discord help button is shown when {@code support.discord-url} is configured,
+     * mirroring the forgot-password flow. The Disconnect button always lets the player
+     * bail out.
      */
     public Dialog captcha(String url, String username, boolean welcome, Component error) {
         Component body = welcome
-                ? m.captchaWelcomeBody(username, url)
-                : m.captchaRenewalBody(username, url);
+                ? m.captchaWelcomeBody(username)
+                : m.captchaRenewalBody(username);
         Component title = welcome ? m.captchaWelcomeTitle() : m.captchaRenewalTitle();
-        List<ActionButton> buttons = List.of(
-                customButton(m.captchaButtonDisconnect(), KEY_CANCEL)
-        );
+
+        List<ActionButton> buttons = new ArrayList<>();
+        buttons.add(ActionButton.builder(m.captchaButtonOpen())
+                .action(DialogAction.staticAction(ClickEvent.openUrl(url)))
+                .build());
+        String discord = support.discordUrl();
+        if (discord != null && !discord.isBlank()) {
+            buttons.add(ActionButton.builder(m.captchaButtonDiscord())
+                    .action(DialogAction.staticAction(ClickEvent.openUrl(discord)))
+                    .build());
+        }
+        buttons.add(customButton(m.captchaButtonDisconnect(), KEY_CANCEL));
+
         return Dialog.create(f -> f.empty()
                 .base(DialogBase.builder(title)
                         .canCloseWithEscape(false)

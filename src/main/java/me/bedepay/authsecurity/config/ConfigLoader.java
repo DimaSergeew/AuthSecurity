@@ -131,7 +131,7 @@ public final class ConfigLoader {
 
     private static PluginConfig.CaptchaConfig readCaptcha(ConfigurationSection s) {
         if (s == null) {
-            return new PluginConfig.CaptchaConfig(false, "", "", "0.0.0.0", 25590, "", 10, 7, 50, defaultWebTexts());
+            return new PluginConfig.CaptchaConfig(false, "", "", "0.0.0.0", 25590, "", 10, 7, true, 50, defaultWebTexts());
         }
         return new PluginConfig.CaptchaConfig(
                 s.getBoolean("enabled", false),
@@ -142,6 +142,7 @@ public final class ConfigLoader {
                 s.getString("public-base-url", ""),
                 s.getInt("token-ttl-minutes", 10),
                 s.getInt("verification-validity-days", 7),
+                s.getBoolean("revalidate-on-ip-change", true),
                 s.getInt("max-concurrent-challenges", 50),
                 readWebTexts(s.getConfigurationSection("web-texts"))
         );
@@ -244,6 +245,8 @@ public final class ConfigLoader {
                 Messages.parse(s.getString("captcha-renewal-title", "")),
                 s.getString("captcha-welcome-body", ""),
                 s.getString("captcha-renewal-body", ""),
+                Messages.parse(s.getString("captcha-button-open", "")),
+                Messages.parse(s.getString("captcha-button-discord", "")),
                 Messages.parse(s.getString("captcha-button-disconnect", "")),
                 Messages.parse(s.getString("captcha-issue-error", "")),
                 Messages.parse(s.getString("captcha-server-busy", ""))
