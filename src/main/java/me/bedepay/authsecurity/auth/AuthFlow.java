@@ -215,8 +215,7 @@ public final class AuthFlow implements Listener {
 
                 if (!captchaResult.ok()) {
                     connectionTracker.release(ip, uuid);
-                    conn.getAudience().closeDialog();
-                    conn.disconnect(captchaResult.disconnectReason());
+                    closeDialogAndDisconnect(conn, captchaResult.disconnectReason());
                     return;
                 }
                 // Captcha passed — close the captcha dialog so the next showDialog
@@ -273,9 +272,24 @@ public final class AuthFlow implements Listener {
             }
         } else {
             connectionTracker.release(ip, uuid);
-            conn.getAudience().closeDialog();
-            conn.disconnect(result.disconnectReason());
+            closeDialogAndDisconnect(conn, result.disconnectReason());
         }
+    }
+
+    /**
+     * Closes any open dialog and disconnects the connection. The brief sleep gives
+     * Netty time to flush the {@code clear_dialog} packet before the disconnect
+     * packet closes the channel — without it the kick (e.g. login-timeout) lands on
+     * the client with the dialog still painted over the disconnect screen.
+     */
+    private static void closeDialogAndDisconnect(PlayerConfigurationConnection conn, Component reason) {
+        conn.getAudience().closeDialog();
+        try {
+            Thread.sleep(150);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+        conn.disconnect(reason);
     }
 
     @EventHandler

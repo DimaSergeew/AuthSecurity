@@ -52,7 +52,7 @@ public final class Dialogs {
                         .body(body(m.loginWelcome(username), error))
                         .inputs(List.of(textInput(FIELD_PASSWORD, m.passwordLabel())))
                         .build())
-                .type(DialogType.multiAction(buttons).build()));
+                .type(DialogType.multiAction(buttons).columns(buttons.size()).build()));
     }
 
     public Dialog register(String username, Component error) {
@@ -68,7 +68,7 @@ public final class Dialogs {
                                 textInput(FIELD_PASSWORD, m.passwordLabel()),
                                 textInput(FIELD_PASSWORD_CONFIRM, m.passwordConfirmLabel())))
                         .build())
-                .type(DialogType.multiAction(buttons).build()));
+                .type(DialogType.multiAction(buttons).columns(buttons.size()).build()));
     }
 
     /**
@@ -90,9 +90,9 @@ public final class Dialogs {
         return Dialog.create(f -> f.empty()
                 .base(DialogBase.builder(m.forgotPasswordTitle())
                         .canCloseWithEscape(true)
-                        .body(List.of(DialogBody.plainMessage(m.forgotPasswordBody())))
+                        .body(List.of(DialogBody.plainMessage(m.forgotPasswordBody(), 1024)))
                         .build())
-                .type(DialogType.multiAction(buttons).build()));
+                .type(DialogType.multiAction(buttons).columns(buttons.size()).build()));
     }
 
     /**
@@ -134,7 +134,7 @@ public final class Dialogs {
                         .canCloseWithEscape(false)
                         .body(body(body, error))
                         .build())
-                .type(DialogType.multiAction(buttons).build()));
+                .type(DialogType.multiAction(buttons).columns(buttons.size()).build()));
     }
 
     public Dialog changePassword(Component error) {
@@ -151,13 +151,13 @@ public final class Dialogs {
                                 textInput(FIELD_PASSWORD,     m.changePasswordNewLabel()),
                                 textInput(FIELD_PASSWORD_CONFIRM, m.changePasswordConfirmLabel())))
                         .build())
-                .type(DialogType.multiAction(buttons).build()));
+                .type(DialogType.multiAction(buttons).columns(buttons.size()).build()));
     }
 
     private static List<DialogBody> body(Component main, Component error) {
-        DialogBody first = DialogBody.plainMessage(main);
+        DialogBody first = DialogBody.plainMessage(main, 1024);
         if (error == null) return List.of(first);
-        return List.of(first, DialogBody.plainMessage(error));
+        return List.of(first, DialogBody.plainMessage(error, 1024));
     }
 
     private static DialogInput textInput(String key, Component label) {
