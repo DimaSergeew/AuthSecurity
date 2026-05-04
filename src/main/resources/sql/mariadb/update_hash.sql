@@ -1,3 +1,3 @@
 UPDATE accounts
-SET hash = ?
+SET hash = ?, updated_at = CURRENT_TIMESTAMP
 WHERE uuid = ?

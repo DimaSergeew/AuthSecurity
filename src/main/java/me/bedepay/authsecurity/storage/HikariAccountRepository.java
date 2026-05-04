@@ -168,10 +168,11 @@ public final class HikariAccountRepository implements AccountRepository {
     }
 
     @Override
-    public boolean markCaptchaVerified(String token) throws SQLException {
+    public boolean markCaptchaVerified(String token, String clientIp) throws SQLException {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.markCaptchaVerified())) {
             ps.setString(1, token);
+            ps.setString(2, clientIp);
             return ps.executeUpdate() > 0;
         }
     }

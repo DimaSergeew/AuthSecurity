@@ -33,12 +33,21 @@ public final class IdleWatcher implements Listener {
 
     private volatile PluginConfig.IdleLogoutConfig config;
     private volatile Messages messages;
+    private volatile AuthFlow authFlow;
     private volatile ScheduledTask sweeperTask;
 
     public IdleWatcher(Plugin plugin, PluginConfig.IdleLogoutConfig config, Messages messages) {
         this.plugin = plugin;
         this.config = config;
         this.messages = messages;
+    }
+
+    /**
+     * Wired after construction because {@link AuthFlow} is built later in {@code onEnable}
+     * to keep the constructor injection graph one-directional.
+     */
+    public void bindAuthFlow(AuthFlow authFlow) {
+        this.authFlow = authFlow;
     }
 
     public void start() {
@@ -78,6 +87,11 @@ public final class IdleWatcher implements Listener {
                 lastActivity.remove(uuid);
                 continue;
             }
+            // Drop the trusted-IP fast-path before kicking, otherwise the next reconnect
+            // would silently restore the player and the idle-kick wouldn't actually
+            // "ask them to log in again" as documented in config.yml.
+            AuthFlow flow = this.authFlow;
+            if (flow != null) flow.invalidate(uuid);
             player.getScheduler().run(plugin, $ -> player.kick(messages.idleKick()), null);
         }
     }
