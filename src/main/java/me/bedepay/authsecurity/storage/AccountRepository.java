@@ -19,17 +19,11 @@ public interface AccountRepository extends AutoCloseable {
 
     boolean delete(UUID uuid) throws SQLException;
 
-    void insertCaptchaToken(String token, UUID uuid, String username, String ip, long ttlSeconds) throws SQLException;
+    void insertCaptchaToken(String token, UUID uuid, String username, long ttlSeconds) throws SQLException;
 
     boolean isCaptchaVerified(String token) throws SQLException;
 
-    /**
-     * Marks the captcha token verified, but only if the IP that solved it matches the IP
-     * that requested it (or if no IP was recorded at issue time). Returns {@code true} on a
-     * successful update; {@code false} if the token is missing, expired, or comes from a
-     * different IP than the one that requested it.
-     */
-    boolean markCaptchaVerified(String token, String clientIp) throws SQLException;
+    boolean markCaptchaVerified(String token) throws SQLException;
 
     int deleteExpiredCaptchaTokens() throws SQLException;
 

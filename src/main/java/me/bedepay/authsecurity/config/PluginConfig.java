@@ -75,17 +75,9 @@ public record PluginConfig(
             int tokenTtlMinutes,
             int verificationValidityDays,
             boolean refreshVerificationOnLogin,
-            boolean verifyClientIp,
             boolean revalidateOnIpChange,
             int maxConcurrentChallenges,
-            CaptchaProxyConfig proxy,
             CaptchaWebTexts webTexts
-    ) {}
-
-    public record CaptchaProxyConfig(
-            boolean enabled,
-            java.util.List<String> trustedIps,
-            String forwardedForHeader
     ) {}
 
     /**

@@ -89,14 +89,14 @@ public final class CaptchaService {
      * Generates a 32-byte random token (base64url, ~43 chars) and persists it.
      * Returns the token string the player must visit, or {@code null} on DB error.
      */
-    public String issueToken(UUID uuid, String username, String ip) {
+    public String issueToken(UUID uuid, String username) {
         byte[] buf = new byte[32];
         random.nextBytes(buf);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(buf);
 
         long ttlSeconds = TimeUnit.MINUTES.toSeconds(Math.max(1, config.tokenTtlMinutes()));
         try {
-            accounts.insertCaptchaToken(token, uuid, username, ip, ttlSeconds);
+            accounts.insertCaptchaToken(token, uuid, username, ttlSeconds);
             return token;
         } catch (SQLException e) {
             plugin.getSLF4JLogger().error("Failed to insert captcha token for {}", uuid, e);
@@ -139,13 +139,12 @@ public final class CaptchaService {
      * synchronous send would block a Jetty worker for up to {@code timeout} per request,
      * making the gate easy to DoS by hammering /verify with junk responses.
      */
-    public CompletableFuture<Boolean> markVerified(String token, String cfResponse, String clientIp) {
+    public CompletableFuture<Boolean> markVerified(String token, String cfResponse) {
         if (token == null || token.isBlank() || cfResponse == null || cfResponse.isBlank()) {
             return CompletableFuture.completedFuture(false);
         }
         String form = "secret=" + enc(config.secretKey())
-                + "&response=" + enc(cfResponse)
-                + (clientIp != null ? "&remoteip=" + enc(clientIp) : "");
+                + "&response=" + enc(cfResponse);
         HttpRequest req = HttpRequest.newBuilder(URI.create(SITEVERIFY_URL))
                 .timeout(Duration.ofSeconds(10))
                 .header("Content-Type", "application/x-www-form-urlencoded")
@@ -168,7 +167,7 @@ public final class CaptchaService {
                         return false;
                     }
                     try {
-                        boolean updated = accounts.markCaptchaVerified(token, clientIp);
+                        boolean updated = accounts.markCaptchaVerified(token);
                         if (updated) {
                             Runnable cb = verifyCallbacks.remove(token);
                             if (cb != null) {
@@ -179,8 +178,7 @@ public final class CaptchaService {
                                 }
                             }
                         } else {
-                            plugin.getSLF4JLogger().info("Captcha verify for token had no effect (expired, missing, or IP mismatch from {})",
-                                    clientIp);
+                            plugin.getSLF4JLogger().info("Captcha verify for token had no effect (expired or missing)");
                         }
                         return updated;
                     } catch (SQLException dbErr) {

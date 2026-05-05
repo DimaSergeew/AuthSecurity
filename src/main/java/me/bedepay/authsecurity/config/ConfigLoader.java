@@ -173,9 +173,8 @@ public final class ConfigLoader {
         if (s == null) {
             return new PluginConfig.CaptchaConfig(
                     false, "", "", "0.0.0.0", 25590, "",
-                    10, 7, false, true, true, 50, defaultProxy(), defaultWebTexts());
+                    10, 7, false, true, 50, defaultWebTexts());
         }
-        ConfigurationSection proxySec = s.getConfigurationSection("proxy");
         return new PluginConfig.CaptchaConfig(
                 s.getBoolean("enabled", false),
                 s.getString("site-key", ""),
@@ -186,27 +185,9 @@ public final class ConfigLoader {
                 s.getInt("token-ttl-minutes", 10),
                 s.getInt("verification-validity-days", 7),
                 s.getBoolean("refresh-verification-on-login", false),
-                s.getBoolean("verify-client-ip", true),
                 s.getBoolean("revalidate-on-ip-change", true),
                 s.getInt("max-concurrent-challenges", 50),
-                readProxy(proxySec),
                 readWebTexts(s.getConfigurationSection("web-texts"))
-        );
-    }
-
-    private static PluginConfig.CaptchaProxyConfig defaultProxy() {
-        return new PluginConfig.CaptchaProxyConfig(false, List.of("127.0.0.1", "::1"), "X-Forwarded-For");
-    }
-
-    private static PluginConfig.CaptchaProxyConfig readProxy(ConfigurationSection s) {
-        PluginConfig.CaptchaProxyConfig d = defaultProxy();
-        if (s == null) return d;
-        List<String> trustedIps = s.getStringList("trusted-ips");
-        if (trustedIps.isEmpty()) trustedIps = d.trustedIps();
-        return new PluginConfig.CaptchaProxyConfig(
-                s.getBoolean("enabled", d.enabled()),
-                trustedIps,
-                s.getString("forwarded-for-header", d.forwardedForHeader())
         );
     }
 
@@ -366,10 +347,6 @@ public final class ConfigLoader {
         if (captcha.maxConcurrentChallenges() < 0) {
             errors.add("captcha.max-concurrent-challenges must be 0 or greater");
         }
-        if (captcha.proxy().forwardedForHeader() == null || captcha.proxy().forwardedForHeader().isBlank()) {
-            errors.add("captcha.proxy.forwarded-for-header must not be blank");
-        }
-
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Invalid config.yml:\n - " + String.join("\n - ", errors));
         }

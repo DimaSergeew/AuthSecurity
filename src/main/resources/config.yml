@@ -90,8 +90,6 @@ captcha:
   # If false, captcha_verified_at is updated only after a real captcha pass.
   # If true, every successful login refreshes the captcha validity window.
   refresh-verification-on-login: false
-  # If false, captcha token verification does not compare the web request IP with the Minecraft IP.
-  verify-client-ip: true
   # Re-prompt the captcha when the player's IP differs from the one used during the
   # last successful verification. Helps against session hijacks / cookie theft scenarios
   # where an attacker reuses an authenticated UUID from a different network. Disable for
@@ -102,15 +100,6 @@ captcha:
   # is the main defence against a botnet trying to exhaust your thread pool. Set to 0
   # to disable the limit (not recommended on a public server).
   max-concurrent-challenges: 50
-
-  # Reverse proxy support for nginx/Cloudflare tunnels/etc. Only enable this when the
-  # captcha web server is reachable through a proxy you control.
-  proxy:
-    enabled: false
-    trusted-ips:
-      - "127.0.0.1"
-      - "::1"
-    forwarded-for-header: "X-Forwarded-For"
 
   # Texts rendered into the captcha web page (https://<your-host>/c/<token>).
   # Plain text (NOT MiniMessage). Use YAML block scalar "|-" for multi-line

@@ -211,8 +211,7 @@ public final class AuthFlow implements Listener {
             }
             try {
                 boolean welcome = (account == null);
-                String token = captchaService.issueToken(
-                        uuid, username, captchaConfig.verifyClientIp() ? ip : null);
+                String token = captchaService.issueToken(uuid, username);
                 if (token == null) {
                     connectionTracker.release(ip, uuid);
                     conn.disconnect(messages.captchaIssueError());

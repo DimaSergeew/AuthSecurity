@@ -145,14 +145,13 @@ public final class HikariAccountRepository implements AccountRepository {
     }
 
     @Override
-    public void insertCaptchaToken(String token, UUID uuid, String username, String ip, long ttlSeconds) throws SQLException {
+    public void insertCaptchaToken(String token, UUID uuid, String username, long ttlSeconds) throws SQLException {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.insertCaptchaToken())) {
             ps.setString(1, token);
             ps.setString(2, uuid.toString());
             ps.setString(3, username);
-            ps.setString(4, ip);
-            ps.setLong(5, ttlSeconds);
+            ps.setLong(4, ttlSeconds);
             ps.executeUpdate();
         }
     }
@@ -169,11 +168,10 @@ public final class HikariAccountRepository implements AccountRepository {
     }
 
     @Override
-    public boolean markCaptchaVerified(String token, String clientIp) throws SQLException {
+    public boolean markCaptchaVerified(String token) throws SQLException {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.markCaptchaVerified())) {
             ps.setString(1, token);
-            ps.setString(2, clientIp);
             return ps.executeUpdate() > 0;
         }
     }
