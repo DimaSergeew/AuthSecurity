@@ -20,7 +20,7 @@ import java.util.List;
  */
 public final class ConfigLoader {
 
-    private static final int CONFIG_VERSION = 2;
+    private static final int CONFIG_VERSION = 3;
 
     private ConfigLoader() {}
 
