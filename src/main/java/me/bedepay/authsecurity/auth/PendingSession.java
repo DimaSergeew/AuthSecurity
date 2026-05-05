@@ -17,21 +17,22 @@ public record PendingSession(
         String ip,
         AtomicInteger attempts,
         String captchaToken,
-        boolean renewal
+        boolean renewal,
+        long createdAtMillis
 ) {
     public static PendingSession forLogin(String username, String hash, String ip) {
         return new PendingSession(new CompletableFuture<>(), hash, username, ip,
-                new AtomicInteger(0), null, false);
+                new AtomicInteger(0), null, false, System.currentTimeMillis());
     }
 
     public static PendingSession forRegister(String username, String ip) {
         return new PendingSession(new CompletableFuture<>(), null, username, ip,
-                new AtomicInteger(0), null, false);
+                new AtomicInteger(0), null, false, System.currentTimeMillis());
     }
 
     public static PendingSession forCaptcha(String username, String ip, String token, boolean renewal) {
         return new PendingSession(new CompletableFuture<>(), null, username, ip,
-                new AtomicInteger(0), token, renewal);
+                new AtomicInteger(0), token, renewal, System.currentTimeMillis());
     }
 
     public boolean isRegister() { return hash == null && captchaToken == null; }

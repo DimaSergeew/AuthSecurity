@@ -70,6 +70,9 @@ public final class AuthSecurity extends JavaPlugin {
         adminCommands = new AdminCommands(
                 this, accounts, authFlow, config.messages(), this::reload);
 
+        idleWatcher.bindAuthFlow(authFlow);
+        lockoutTracker.startSweeper(this);
+
         getServer().getPluginManager().registerEvents(authFlow, this);
         getServer().getPluginManager().registerEvents(authCommands, this);
         getServer().getPluginManager().registerEvents(idleWatcher, this);
@@ -88,6 +91,7 @@ public final class AuthSecurity extends JavaPlugin {
     @Override
     public void onDisable() {
         if (idleWatcher != null) idleWatcher.stop();
+        if (lockoutTracker != null) lockoutTracker.stopSweeper();
         if (captchaService != null) captchaService.stop();
         if (captchaWebServer != null) captchaWebServer.stop();
         if (accounts != null) accounts.close();

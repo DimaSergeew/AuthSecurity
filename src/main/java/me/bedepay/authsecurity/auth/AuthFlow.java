@@ -117,6 +117,10 @@ public final class AuthFlow implements Listener {
 
         if (security.sessionTrustEnabled() && ip != null && ip.equals(trustedSessions.get(uuid))) {
             authenticated.put(uuid, true);
+            // Renew the TTL so the trusted entry doesn't disappear mid-session if the
+            // player reconnected close to expiry — otherwise the next reconnect would
+            // unexpectedly require a full login despite ongoing activity.
+            scheduleTrustExpiry(uuid);
             return;
         }
 
@@ -194,7 +198,7 @@ public final class AuthFlow implements Listener {
                         AuthResult.denied(messages.loginTimedOut()),
                         Math.max(1, captchaConfig.tokenTtlMinutes()),
                         TimeUnit.MINUTES);
-                pending.put(uuid, captchaSession);
+                replacePending(uuid, captchaSession);
 
                 // Push-callback: when the player solves the Turnstile challenge in their
                 // browser, CaptchaService.markVerified fires this from the Javalin thread,
@@ -232,7 +236,7 @@ public final class AuthFlow implements Listener {
 
         AuthResult timeoutResult = AuthResult.denied(messages.loginTimedOut());
         session.future().completeOnTimeout(timeoutResult, security.loginTimeoutMinutes(), TimeUnit.MINUTES);
-        pending.put(uuid, session);
+        replacePending(uuid, session);
 
         conn.getAudience().showDialog(session.isRegister()
                 ? dialogs.register(session.username(), null)
@@ -292,16 +296,54 @@ public final class AuthFlow implements Listener {
         conn.disconnect(reason);
     }
 
+    /**
+     * Reconnect race: PlayerConnectionCloseEvent only carries UUID/IP, not the underlying
+     * connection. If a player closes and reconnects fast, the close for the OLD connection
+     * may fire AFTER the configure handler for the NEW connection has already inserted its
+     * session into {@link #pending}. Blindly removing/cancelling that entry would kick the
+     * fresh player with "Login cancelled".
+     *
+     * Mitigation: only cancel the pending session if it has been parked long enough that it
+     * almost certainly belongs to the closing connection. A session younger than this window
+     * is assumed to be for the new connection and is left alone — its own close (if it ever
+     * comes) will fire later, or its future will time out / be replaced normally.
+     */
+    private static final long PENDING_CLOSE_GRACE_MILLIS = 250;
+
     @EventHandler
     public void onConnectionClose(PlayerConnectionCloseEvent event) {
         UUID uuid = event.getPlayerUniqueId();
         authenticated.remove(uuid);
-        PendingSession session = pending.remove(uuid);
-        if (session != null && !session.future().isDone()) {
-            session.future().complete(AuthResult.denied(messages.loginCancelled()));
-        }
+        long now = System.currentTimeMillis();
+        pending.compute(uuid, (k, sess) -> {
+            if (sess == null) return null;
+            if (now - sess.createdAtMillis() < PENDING_CLOSE_GRACE_MILLIS) {
+                return sess;
+            }
+            if (!sess.future().isDone()) {
+                sess.future().complete(AuthResult.denied(messages.loginCancelled()));
+            }
+            return null;
+        });
         String ip = event.getIpAddress() == null ? null : event.getIpAddress().getHostAddress();
         connectionTracker.release(ip, uuid);
+    }
+
+    /**
+     * Atomically install {@code session} as the pending entry for {@code uuid}, completing
+     * any previously parked session's future so its configure thread can unwind. Without this
+     * a stale session from a previous connection would leak: its future would never complete
+     * (close-handler can't tell it apart from the new one — see {@link #onConnectionClose}),
+     * leaving the old async config-event thread blocked until {@code login-timeout-minutes}.
+     */
+    private void replacePending(UUID uuid, PendingSession session) {
+        PendingSession previous = pending.put(uuid, session);
+        if (previous != null && previous != session && !previous.future().isDone()) {
+            if (previous.captchaToken() != null) {
+                captchaService.cancelWaiter(previous.captchaToken());
+            }
+            previous.future().complete(AuthResult.denied(messages.loginCancelled()));
+        }
     }
 
     // =========================================================================
@@ -436,6 +478,8 @@ public final class AuthFlow implements Listener {
 
     private static String extractIp(PlayerConfigurationConnection conn) {
         InetSocketAddress addr = conn.getClientAddress();
-        return addr != null ? addr.getAddress().getHostAddress() : null;
+        if (addr == null) return null;
+        java.net.InetAddress a = addr.getAddress();
+        return a != null ? a.getHostAddress() : addr.getHostString();
     }
 }

@@ -38,9 +38,16 @@ public final class CaptchaWebServer {
             cfg.showJavalinBanner = false;
             cfg.useVirtualThreads = false;
             cfg.jetty.defaultHost = bindHost;
-            cfg.requestLogger.http((ctx, ms) -> plugin.getSLF4JLogger().info(
-                    "captcha-web {} \"{} {}\" {} {}ms",
-                    ctx.ip(), ctx.method(), ctx.path(), ctx.status().getCode(), ms.longValue()));
+            cfg.requestLogger.http((ctx, ms) -> {
+                // Captcha tokens appear in the URL path. Redact them before logging so the
+                // server log doesn't become a list of valid tokens any log-shipper can mine
+                // within token-ttl-minutes.
+                String path = ctx.path();
+                if (path.startsWith("/c/")) path = "/c/[redacted]";
+                plugin.getSLF4JLogger().info(
+                        "captcha-web {} \"{} {}\" {} {}ms",
+                        ctx.ip(), ctx.method(), path, ctx.status().getCode(), ms.longValue());
+            });
         });
         app.get("/", ctx -> ctx.result("AuthSecurity captcha gate OK"));
         app.get("/c/{token}", this::serveWidget);
@@ -76,7 +83,13 @@ public final class CaptchaWebServer {
                 .replace("{{hint}}",      escapeHtml(t.hint()))
                 .replace("{{footer}}",    escapeHtml(t.footer()))
                 .replace("{{i18nJson}}",  buildI18nJson(t));
-        ctx.contentType("text/html; charset=utf-8").result(html);
+        // no-store: prevents browser back/forward replay of solved tokens.
+        // no-referrer: keeps /c/{token} out of Referer when the user clicks an
+        // outbound link (Discord support button, etc.).
+        ctx.header("Cache-Control", "no-store")
+           .header("Referrer-Policy", "no-referrer")
+           .contentType("text/html; charset=utf-8")
+           .result(html);
     }
 
     private void handleVerify(Context ctx) {
@@ -92,12 +105,16 @@ public final class CaptchaWebServer {
             return;
         }
         String clientIp = ctx.ip();
-        boolean ok = captcha.markVerified(token, cfResponse, clientIp);
-        if (ok) {
-            ctx.status(HttpStatus.OK).result("ok");
-        } else {
-            ctx.status(HttpStatus.BAD_REQUEST).result("verification failed");
-        }
+        // Async: releases the Jetty worker thread while we wait on Cloudflare's siteverify
+        // (up to 10s). Without this, a flood of /verify with junk responses would saturate
+        // the worker pool and starve legitimate requests.
+        ctx.future(() -> captcha.markVerified(token, cfResponse, clientIp).thenAccept(ok -> {
+            if (ok) {
+                ctx.status(HttpStatus.OK).result("ok");
+            } else {
+                ctx.status(HttpStatus.BAD_REQUEST).result("verification failed");
+            }
+        }));
     }
 
     private static String jsonField(String body, String name) {

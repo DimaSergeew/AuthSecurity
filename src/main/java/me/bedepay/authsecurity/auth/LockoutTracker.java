@@ -1,6 +1,8 @@
 package me.bedepay.authsecurity.auth;
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import me.bedepay.authsecurity.config.PluginConfig;
+import org.bukkit.plugin.Plugin;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +20,7 @@ public final class LockoutTracker {
 
     private final ConcurrentHashMap<String, Entry> entries = new ConcurrentHashMap<>();
     private volatile PluginConfig.LockoutConfig config;
+    private volatile ScheduledTask sweeperTask;
 
     public LockoutTracker(PluginConfig.LockoutConfig config) {
         this.config = config;
@@ -25,6 +28,36 @@ public final class LockoutTracker {
 
     public void applyConfig(PluginConfig.LockoutConfig config) {
         this.config = config;
+    }
+
+    /**
+     * Periodic sweep that drops entries whose ban window has elapsed. Without this,
+     * IPs that failed N&lt;max attempts and never returned would accumulate forever.
+     */
+    @SuppressWarnings("UnstableApiUsage")
+    public void startSweeper(Plugin plugin) {
+        stopSweeper();
+        sweeperTask = plugin.getServer().getAsyncScheduler().runAtFixedRate(
+                plugin, $ -> sweep(), 5, 5, TimeUnit.MINUTES);
+    }
+
+    public void stopSweeper() {
+        if (sweeperTask != null) {
+            sweeperTask.cancel();
+            sweeperTask = null;
+        }
+    }
+
+    private void sweep() {
+        long now = System.currentTimeMillis();
+        entries.entrySet().removeIf(e -> {
+            Entry v = e.getValue();
+            // Active ban — keep.
+            if (v.lockedUntilMillis() > now) return false;
+            // Counted failures with no active ban — keep, so the count survives a brief pause.
+            // Otherwise, ban expired or was never set: safe to drop.
+            return v.lockedUntilMillis() != 0L;
+        });
     }
 
     /**

@@ -23,7 +23,13 @@ public interface AccountRepository extends AutoCloseable {
 
     boolean isCaptchaVerified(String token) throws SQLException;
 
-    boolean markCaptchaVerified(String token) throws SQLException;
+    /**
+     * Marks the captcha token verified, but only if the IP that solved it matches the IP
+     * that requested it (or if no IP was recorded at issue time). Returns {@code true} on a
+     * successful update; {@code false} if the token is missing, expired, or comes from a
+     * different IP than the one that requested it.
+     */
+    boolean markCaptchaVerified(String token, String clientIp) throws SQLException;
 
     int deleteExpiredCaptchaTokens() throws SQLException;
 

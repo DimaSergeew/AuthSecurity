@@ -17,8 +17,10 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * Issues short-lived captcha verification tokens, verifies Turnstile responses
@@ -28,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 public final class CaptchaService {
 
     private static final String SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+    private static final Pattern SUCCESS_REGEX = Pattern.compile("\"success\"\\s*:\\s*true\\b");
 
     private final Plugin plugin;
     private final AccountRepository accounts;
@@ -128,51 +131,63 @@ public final class CaptchaService {
     }
 
     /**
-     * Calls Cloudflare's siteverify and, on success, marks the token verified in the DB.
-     * Returns {@code true} on full success, {@code false} on any failure.
+     * Calls Cloudflare's siteverify asynchronously and, on success, marks the token verified
+     * in the DB. The returned future never completes exceptionally — failures (network, bad
+     * response, DB error) resolve to {@code false}.
+     *
+     * Async on purpose: this is invoked from the captcha web server's HTTP handler, and a
+     * synchronous send would block a Jetty worker for up to {@code timeout} per request,
+     * making the gate easy to DoS by hammering /verify with junk responses.
      */
-    public boolean markVerified(String token, String cfResponse, String clientIp) {
+    public CompletableFuture<Boolean> markVerified(String token, String cfResponse, String clientIp) {
         if (token == null || token.isBlank() || cfResponse == null || cfResponse.isBlank()) {
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
-        try {
-            String form = "secret=" + enc(config.secretKey())
-                    + "&response=" + enc(cfResponse)
-                    + (clientIp != null ? "&remoteip=" + enc(clientIp) : "");
-            HttpRequest req = HttpRequest.newBuilder(URI.create(SITEVERIFY_URL))
-                    .timeout(Duration.ofSeconds(10))
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(form))
-                    .build();
-            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
-            if (resp.statusCode() != 200) {
-                plugin.getSLF4JLogger().warn("Turnstile siteverify returned HTTP {}", resp.statusCode());
-                return false;
-            }
-            // Body is JSON like {"success": true, ...}. We only care about the success boolean.
-            // Avoid pulling in a JSON dep for one field.
-            String body = resp.body();
-            boolean success = body != null && body.contains("\"success\":true");
-            if (!success) {
-                plugin.getSLF4JLogger().info("Turnstile rejected response: {}", body);
-                return false;
-            }
-            boolean updated = accounts.markCaptchaVerified(token);
-            if (updated) {
-                Runnable cb = verifyCallbacks.remove(token);
-                if (cb != null) {
-                    try {
-                        cb.run();
-                    } catch (Exception cbErr) {
-                        plugin.getSLF4JLogger().warn("Captcha verify callback failed for token", cbErr);
+        String form = "secret=" + enc(config.secretKey())
+                + "&response=" + enc(cfResponse)
+                + (clientIp != null ? "&remoteip=" + enc(clientIp) : "");
+        HttpRequest req = HttpRequest.newBuilder(URI.create(SITEVERIFY_URL))
+                .timeout(Duration.ofSeconds(10))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(form))
+                .build();
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .handle((resp, err) -> {
+                    if (err != null) {
+                        plugin.getSLF4JLogger().warn("Turnstile siteverify call failed", err);
+                        return false;
                     }
-                }
-            }
-            return updated;
-        } catch (Exception e) {
-            plugin.getSLF4JLogger().warn("Turnstile siteverify call failed", e);
-            return false;
-        }
+                    if (resp.statusCode() != 200) {
+                        plugin.getSLF4JLogger().warn("Turnstile siteverify returned HTTP {}", resp.statusCode());
+                        return false;
+                    }
+                    String body = resp.body();
+                    boolean success = body != null && SUCCESS_REGEX.matcher(body).find();
+                    if (!success) {
+                        plugin.getSLF4JLogger().info("Turnstile rejected response: {}", body);
+                        return false;
+                    }
+                    try {
+                        boolean updated = accounts.markCaptchaVerified(token, clientIp);
+                        if (updated) {
+                            Runnable cb = verifyCallbacks.remove(token);
+                            if (cb != null) {
+                                try {
+                                    cb.run();
+                                } catch (Exception cbErr) {
+                                    plugin.getSLF4JLogger().warn("Captcha verify callback failed for token", cbErr);
+                                }
+                            }
+                        } else {
+                            plugin.getSLF4JLogger().info("Captcha verify for token had no effect (expired, missing, or IP mismatch from {})",
+                                    clientIp);
+                        }
+                        return updated;
+                    } catch (SQLException dbErr) {
+                        plugin.getSLF4JLogger().warn("DB error while marking captcha verified", dbErr);
+                        return false;
+                    }
+                });
     }
 
     private static String enc(String value) {
