@@ -96,22 +96,25 @@ public final class AuthCommands implements Listener {
     @Permission(PERM_UNREGISTER)
     public void unregister(CommandSourceStack source,
                            @Argument(value = "player", suggestions = SUGGEST_PLAYERS) String player) {
-        Audience audience = source.getSender();
-        try {
-            Account account = accounts.findByUsername(player);
-            if (account == null) {
-                audience.sendMessage(messages.commandPlayerNotFound(player));
-                return;
+        CommandSender sender = source.getSender();
+        plugin.getServer().getAsyncScheduler().runNow(plugin, $ -> {
+            try {
+                Account account = accounts.findByUsername(player);
+                if (account == null) {
+                    runForSender(sender, () -> sender.sendMessage(messages.commandPlayerNotFound(player)));
+                    return;
+                }
+                accounts.delete(account.uuid());
+                authFlow.invalidate(account.uuid());
+                kickIfOnline(account.uuid(), messages.adminAccountUnregisteredKick());
+                runForSender(sender, () -> sender.sendMessage(messages.commandUnregisterSuccess(account.username())));
+                plugin.getSLF4JLogger().info("Unregistered account: {} ({}), requester={}",
+                        account.username(), account.uuid(), sender.getName());
+            } catch (SQLException e) {
+                plugin.getSLF4JLogger().error("/unregister {} failed", player, e);
+                runForSender(sender, () -> sender.sendMessage(messages.internalError()));
             }
-            accounts.delete(account.uuid());
-            authFlow.invalidate(account.uuid());
-            audience.sendMessage(messages.commandUnregisterSuccess(account.username()));
-            plugin.getSLF4JLogger().info("Unregistered account: {} ({}), requester={}",
-                    account.username(), account.uuid(), source.getSender().getName());
-        } catch (SQLException e) {
-            plugin.getSLF4JLogger().error("/unregister {} failed", player, e);
-            audience.sendMessage(messages.internalError());
-        }
+        });
     }
 
     // =========================================================================
@@ -123,27 +126,30 @@ public final class AuthCommands implements Listener {
     public void changePasswordAdmin(CommandSourceStack source,
                                     @Argument(value = "player", suggestions = SUGGEST_PLAYERS) String player,
                                     @Argument("newpass") String newpass) {
-        Audience audience = source.getSender();
+        CommandSender sender = source.getSender();
         Component err = PasswordPolicy.validate(newpass, newpass, security, messages);
         if (err != null) {
-            audience.sendMessage(err);
+            sender.sendMessage(err);
             return;
         }
-        try {
-            Account account = accounts.findByUsername(player);
-            if (account == null) {
-                audience.sendMessage(messages.commandPlayerNotFound(player));
-                return;
+        plugin.getServer().getAsyncScheduler().runNow(plugin, $ -> {
+            try {
+                Account account = accounts.findByUsername(player);
+                if (account == null) {
+                    runForSender(sender, () -> sender.sendMessage(messages.commandPlayerNotFound(player)));
+                    return;
+                }
+                accounts.updateHash(account.uuid(), PasswordHasher.hash(newpass));
+                authFlow.invalidate(account.uuid());
+                kickIfOnline(account.uuid(), messages.adminPasswordChangedKick());
+                runForSender(sender, () -> sender.sendMessage(messages.commandChangePasswordAdminSuccess(account.username())));
+                plugin.getSLF4JLogger().info("Admin changed password for {} ({}), requester={}",
+                        account.username(), account.uuid(), sender.getName());
+            } catch (SQLException e) {
+                plugin.getSLF4JLogger().error("/changepassword {} failed", player, e);
+                runForSender(sender, () -> sender.sendMessage(messages.internalError()));
             }
-            accounts.updateHash(account.uuid(), PasswordHasher.hash(newpass));
-            authFlow.invalidate(account.uuid());
-            audience.sendMessage(messages.commandChangePasswordAdminSuccess(account.username()));
-            plugin.getSLF4JLogger().info("Admin changed password for {} ({}), requester={}",
-                    account.username(), account.uuid(), source.getSender().getName());
-        } catch (SQLException e) {
-            plugin.getSLF4JLogger().error("/changepassword {} failed", player, e);
-            audience.sendMessage(messages.internalError());
-        }
+        });
     }
 
     // =========================================================================
@@ -166,6 +172,63 @@ public final class AuthCommands implements Listener {
         player.showDialog(dialogs.changePassword(null));
     }
 
+    @Command("authsecurity trustip on")
+    public void trustIpOn(CommandSourceStack source) {
+        CommandSender sender = source.getSender();
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(messages.commandOnlyPlayers());
+            return;
+        }
+        if (!authFlow.isAuthenticated(player.getUniqueId())) {
+            player.sendMessage(messages.commandNotAuthenticated());
+            return;
+        }
+        if (!authFlow.trustedIpFeatureEnabled()) {
+            player.sendMessage(messages.commandTrustIpUnavailable());
+            return;
+        }
+
+        UUID uuid = player.getUniqueId();
+        String ip = currentIp(player);
+        plugin.getServer().getAsyncScheduler().runNow(plugin, $ -> {
+            try {
+                accounts.updateTrustedIpLoginEnabled(uuid, true);
+                runForPlayer(player, () -> {
+                    authFlow.trustCurrentIp(uuid, ip);
+                    player.sendMessage(messages.commandTrustIpEnabled());
+                });
+            } catch (SQLException e) {
+                plugin.getSLF4JLogger().error("/authsecurity trustip on failed for {}", uuid, e);
+                runForPlayer(player, () -> player.sendMessage(messages.internalError()));
+            }
+        });
+    }
+
+    @Command("authsecurity trustip off")
+    public void trustIpOff(CommandSourceStack source) {
+        CommandSender sender = source.getSender();
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(messages.commandOnlyPlayers());
+            return;
+        }
+        if (!authFlow.isAuthenticated(player.getUniqueId())) {
+            player.sendMessage(messages.commandNotAuthenticated());
+            return;
+        }
+
+        UUID uuid = player.getUniqueId();
+        plugin.getServer().getAsyncScheduler().runNow(plugin, $ -> {
+            try {
+                accounts.updateTrustedIpLoginEnabled(uuid, false);
+                authFlow.clearTrustedSession(uuid);
+                runForPlayer(player, () -> player.sendMessage(messages.commandTrustIpDisabled()));
+            } catch (SQLException e) {
+                plugin.getSLF4JLogger().error("/authsecurity trustip off failed for {}", uuid, e);
+                runForPlayer(player, () -> player.sendMessage(messages.internalError()));
+            }
+        });
+    }
+
     // =========================================================================
     // /accountinfo <player>
     // =========================================================================
@@ -174,22 +237,27 @@ public final class AuthCommands implements Listener {
     @Permission(PERM_ACCOUNT_INFO)
     public void accountInfo(CommandSourceStack source,
                             @Argument(value = "player", suggestions = SUGGEST_PLAYERS) String player) {
-        Audience audience = source.getSender();
-        try {
-            Account account = accounts.findByUsername(player);
-            if (account == null) {
-                audience.sendMessage(messages.commandPlayerNotFound(player));
-                return;
+        CommandSender sender = source.getSender();
+        plugin.getServer().getAsyncScheduler().runNow(plugin, $ -> {
+            try {
+                Account account = accounts.findByUsername(player);
+                if (account == null) {
+                    runForSender(sender, () -> sender.sendMessage(messages.commandPlayerNotFound(player)));
+                    return;
+                }
+                runForSender(sender, () -> {
+                    sender.sendMessage(messages.commandAccountInfoHeader(account.username()));
+                    sender.sendMessage(messages.commandAccountInfoLine("uuid",       account.uuid().toString()));
+                    sender.sendMessage(messages.commandAccountInfoLine("last-ip",    safe(account.lastIp())));
+                    sender.sendMessage(messages.commandAccountInfoLine("created",    safe(account.createdAt())));
+                    sender.sendMessage(messages.commandAccountInfoLine("updated",    safe(account.updatedAt())));
+                    sender.sendMessage(messages.commandAccountInfoLine("trusted-ip", Boolean.toString(account.trustedIpLoginEnabled())));
+                });
+            } catch (SQLException e) {
+                plugin.getSLF4JLogger().error("/accountinfo {} failed", player, e);
+                runForSender(sender, () -> sender.sendMessage(messages.internalError()));
             }
-            audience.sendMessage(messages.commandAccountInfoHeader(account.username()));
-            audience.sendMessage(messages.commandAccountInfoLine("uuid",       account.uuid().toString()));
-            audience.sendMessage(messages.commandAccountInfoLine("last-ip",    safe(account.lastIp())));
-            audience.sendMessage(messages.commandAccountInfoLine("created",    safe(account.createdAt())));
-            audience.sendMessage(messages.commandAccountInfoLine("updated",    safe(account.updatedAt())));
-        } catch (SQLException e) {
-            plugin.getSLF4JLogger().error("/accountinfo {} failed", player, e);
-            audience.sendMessage(messages.internalError());
-        }
+        });
     }
 
     // =========================================================================
@@ -258,6 +326,26 @@ public final class AuthCommands implements Listener {
 
     private void runForPlayer(Player player, Runnable action) {
         player.getScheduler().run(plugin, $ -> action.run(), null);
+    }
+
+    private void runForSender(CommandSender sender, Runnable action) {
+        if (sender instanceof Player player) {
+            runForPlayer(player, action);
+        } else {
+            plugin.getServer().getGlobalRegionScheduler().run(plugin, $ -> action.run());
+        }
+    }
+
+    private void kickIfOnline(UUID uuid, Component reason) {
+        Player online = plugin.getServer().getPlayer(uuid);
+        if (online != null) {
+            runForPlayer(online, () -> online.kick(reason));
+        }
+    }
+
+    private static String currentIp(Player player) {
+        if (player.getAddress() == null || player.getAddress().getAddress() == null) return null;
+        return player.getAddress().getAddress().getHostAddress();
     }
 
     private static String safe(Object value) {

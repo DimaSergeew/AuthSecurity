@@ -12,6 +12,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Copies the bundled default config on first run and parses it into a {@link PluginConfig}.
@@ -36,13 +38,15 @@ public final class ConfigLoader {
         FileConfiguration defaults = loadBundledDefaults(plugin);
         if (defaults != null) yml.setDefaults(defaults);
 
-        return new PluginConfig(
+        PluginConfig config = new PluginConfig(
                 readDatabase(section(yml, "database")),
                 readSecurity(section(yml, "security")),
                 readSupport(section(yml, "support")),
                 readCaptcha(yml.getConfigurationSection("captcha")),
                 readMessages(section(yml, "messages"))
         );
+        validate(config);
+        return config;
     }
 
     private static FileConfiguration loadBundledDefaults(Plugin plugin) {
@@ -93,9 +97,9 @@ public final class ConfigLoader {
 
         ConfigurationSection lockoutSec = s.getConfigurationSection("lockout");
         PluginConfig.LockoutConfig lockout = lockoutSec == null
-                ? new PluginConfig.LockoutConfig(true, 5, 15L)
+                ? new PluginConfig.LockoutConfig(false, 5, 15L)
                 : new PluginConfig.LockoutConfig(
-                        lockoutSec.getBoolean("enabled", true),
+                        lockoutSec.getBoolean("enabled", false),
                         lockoutSec.getInt("max-attempts", 5),
                         lockoutSec.getLong("ban-minutes", 15L));
 
@@ -113,12 +117,13 @@ public final class ConfigLoader {
                         policySec.getBoolean("require-letter-and-digit", false));
 
         return new PluginConfig.SecurityConfig(
-                s.getInt("max-attempts", 5),
+                s.getInt("max-attempts", 3),
                 ttlMinutes,
                 s.getLong("login-timeout-minutes", 3L),
                 s.getInt("password-min-length", 6),
                 s.getInt("password-max-length", 72),
                 s.getInt("accounts-per-ip-limit", 3),
+                s.getInt("max-concurrent-auth-sessions", 100),
                 lockout,
                 idle,
                 policy
@@ -131,8 +136,11 @@ public final class ConfigLoader {
 
     private static PluginConfig.CaptchaConfig readCaptcha(ConfigurationSection s) {
         if (s == null) {
-            return new PluginConfig.CaptchaConfig(false, "", "", "0.0.0.0", 25590, "", 10, 7, true, 50, defaultWebTexts());
+            return new PluginConfig.CaptchaConfig(
+                    false, "", "", "0.0.0.0", 25590, "",
+                    10, 7, false, true, true, 50, defaultProxy(), defaultWebTexts());
         }
+        ConfigurationSection proxySec = s.getConfigurationSection("proxy");
         return new PluginConfig.CaptchaConfig(
                 s.getBoolean("enabled", false),
                 s.getString("site-key", ""),
@@ -142,9 +150,28 @@ public final class ConfigLoader {
                 s.getString("public-base-url", ""),
                 s.getInt("token-ttl-minutes", 10),
                 s.getInt("verification-validity-days", 7),
+                s.getBoolean("refresh-verification-on-login", false),
+                s.getBoolean("verify-client-ip", true),
                 s.getBoolean("revalidate-on-ip-change", true),
                 s.getInt("max-concurrent-challenges", 50),
+                readProxy(proxySec),
                 readWebTexts(s.getConfigurationSection("web-texts"))
+        );
+    }
+
+    private static PluginConfig.CaptchaProxyConfig defaultProxy() {
+        return new PluginConfig.CaptchaProxyConfig(false, List.of("127.0.0.1", "::1"), "X-Forwarded-For");
+    }
+
+    private static PluginConfig.CaptchaProxyConfig readProxy(ConfigurationSection s) {
+        PluginConfig.CaptchaProxyConfig d = defaultProxy();
+        if (s == null) return d;
+        List<String> trustedIps = s.getStringList("trusted-ips");
+        if (trustedIps.isEmpty()) trustedIps = d.trustedIps();
+        return new PluginConfig.CaptchaProxyConfig(
+                s.getBoolean("enabled", d.enabled()),
+                trustedIps,
+                s.getString("forwarded-for-header", d.forwardedForHeader())
         );
     }
 
@@ -237,6 +264,12 @@ public final class ConfigLoader {
                 s.getString("command-logout-success", ""),
                 s.getString("command-logout-not-online", ""),
                 Messages.parse(s.getString("command-logout-kick", "")),
+                Messages.parse(s.getString("command-trustip-enabled", "")),
+                Messages.parse(s.getString("command-trustip-disabled", "")),
+                Messages.parse(s.getString("command-trustip-unavailable", "")),
+                Messages.parse(s.getString("trusted-ip-login-hint", "")),
+                Messages.parse(s.getString("admin-password-changed-kick", "")),
+                Messages.parse(s.getString("admin-account-unregistered-kick", "")),
                 Messages.parse(s.getString("command-reload-started", "")),
                 Messages.parse(s.getString("command-reload-success", "")),
                 Messages.parse(s.getString("command-reload-failed", "")),
@@ -249,7 +282,61 @@ public final class ConfigLoader {
                 Messages.parse(s.getString("captcha-button-discord", "")),
                 Messages.parse(s.getString("captcha-button-disconnect", "")),
                 Messages.parse(s.getString("captcha-issue-error", "")),
-                Messages.parse(s.getString("captcha-server-busy", ""))
+                Messages.parse(s.getString("captcha-server-busy", "")),
+                Messages.parse(s.getString("auth-server-busy", ""))
         );
+    }
+
+    private static void validate(PluginConfig c) {
+        List<String> errors = new ArrayList<>();
+
+        PluginConfig.DatabaseConfig db = c.database();
+        String type = db.type() == null ? "" : db.type();
+        if (!"h2".equalsIgnoreCase(type) && !"mariadb".equalsIgnoreCase(type)) {
+            errors.add("database.type must be either 'h2' or 'mariadb'");
+        }
+        if (db.pool().maximumPoolSize() < 1) errors.add("database.pool.maximum-pool-size must be at least 1");
+        if (db.pool().minimumIdle() < 0) errors.add("database.pool.minimum-idle must be at least 0");
+        if (db.pool().minimumIdle() > db.pool().maximumPoolSize()) {
+            errors.add("database.pool.minimum-idle must not exceed database.pool.maximum-pool-size");
+        }
+        if (db.pool().connectionTimeoutMillis() < 1000) {
+            errors.add("database.pool.connection-timeout-millis must be at least 1000");
+        }
+
+        PluginConfig.SecurityConfig sec = c.security();
+        if (sec.maxAttempts() < 1) errors.add("security.max-attempts must be at least 1");
+        if (sec.sessionTtlMinutes() < 0) errors.add("security.session-ttl-minutes must be 0 or greater");
+        if (sec.loginTimeoutMinutes() < 1) errors.add("security.login-timeout-minutes must be at least 1");
+        if (sec.passwordMinLength() < 1) errors.add("security.password-min-length must be at least 1");
+        if (sec.passwordMaxLength() < sec.passwordMinLength()) {
+            errors.add("security.password-max-length must be greater than or equal to security.password-min-length");
+        }
+        if (sec.accountsPerIpLimit() < 1) errors.add("security.accounts-per-ip-limit must be at least 1");
+        if (sec.maxConcurrentAuthSessions() < 0) {
+            errors.add("security.max-concurrent-auth-sessions must be 0 or greater");
+        }
+        if (sec.lockout().maxAttempts() < 1) errors.add("security.lockout.max-attempts must be at least 1");
+        if (sec.lockout().banMinutes() < 1) errors.add("security.lockout.ban-minutes must be at least 1");
+        if (sec.idleLogout().minutes() < 1) errors.add("security.idle-logout.minutes must be at least 1");
+
+        PluginConfig.CaptchaConfig captcha = c.captcha();
+        if (captcha.webPort() < 1 || captcha.webPort() > 65535) {
+            errors.add("captcha.web-port must be between 1 and 65535");
+        }
+        if (captcha.tokenTtlMinutes() < 1) errors.add("captcha.token-ttl-minutes must be at least 1");
+        if (captcha.verificationValidityDays() < 0) {
+            errors.add("captcha.verification-validity-days must be 0 or greater");
+        }
+        if (captcha.maxConcurrentChallenges() < 0) {
+            errors.add("captcha.max-concurrent-challenges must be 0 or greater");
+        }
+        if (captcha.proxy().forwardedForHeader() == null || captcha.proxy().forwardedForHeader().isBlank()) {
+            errors.add("captcha.proxy.forwarded-for-header must not be blank");
+        }
+
+        if (!errors.isEmpty()) {
+            throw new IllegalStateException("Invalid config.yml:\n - " + String.join("\n - ", errors));
+        }
     }
 }

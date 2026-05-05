@@ -11,5 +11,6 @@ public record Account(
         Timestamp createdAt,
         Timestamp updatedAt,
         Timestamp captchaVerifiedAt,
-        String captchaVerifiedIp
+        String captchaVerifiedIp,
+        boolean trustedIpLoginEnabled
 ) {}

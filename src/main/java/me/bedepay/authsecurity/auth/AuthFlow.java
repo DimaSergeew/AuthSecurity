@@ -19,6 +19,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.net.InetSocketAddress;
@@ -47,7 +48,11 @@ public final class AuthFlow implements Listener {
     private final Map<UUID, String> trustedSessions = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledTask> trustExpiryTasks = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
+    private final java.util.Set<UUID> trustHintPending = ConcurrentHashMap.newKeySet();
+    private final java.util.Set<UUID> trustHintShownThisRun = ConcurrentHashMap.newKeySet();
     private final java.util.concurrent.atomic.AtomicInteger captchaInflight =
+            new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicInteger authInflight =
             new java.util.concurrent.atomic.AtomicInteger();
 
     public AuthFlow(Plugin plugin,
@@ -91,8 +96,25 @@ public final class AuthFlow implements Listener {
     public void invalidate(UUID uuid) {
         trustedSessions.remove(uuid);
         authenticated.remove(uuid);
+        trustHintPending.remove(uuid);
         ScheduledTask task = trustExpiryTasks.remove(uuid);
         if (task != null) task.cancel();
+    }
+
+    public void clearTrustedSession(UUID uuid) {
+        trustedSessions.remove(uuid);
+        ScheduledTask task = trustExpiryTasks.remove(uuid);
+        if (task != null) task.cancel();
+    }
+
+    public boolean trustedIpFeatureEnabled() {
+        return security.sessionTrustEnabled();
+    }
+
+    public void trustCurrentIp(UUID uuid, String ip) {
+        if (!security.sessionTrustEnabled() || ip == null || ip.isBlank()) return;
+        trustedSessions.put(uuid, ip);
+        scheduleTrustExpiry(uuid);
     }
 
     // =========================================================================
@@ -112,15 +134,6 @@ public final class AuthFlow implements Listener {
 
         if (!connectionTracker.tryAcquire(ip, uuid, security.accountsPerIpLimit())) {
             conn.disconnect(messages.ipLimitReached(security.accountsPerIpLimit()));
-            return;
-        }
-
-        if (security.sessionTrustEnabled() && ip != null && ip.equals(trustedSessions.get(uuid))) {
-            authenticated.put(uuid, true);
-            // Renew the TTL so the trusted entry doesn't disappear mid-session if the
-            // player reconnected close to expiry — otherwise the next reconnect would
-            // unexpectedly require a full login despite ongoing activity.
-            scheduleTrustExpiry(uuid);
             return;
         }
 
@@ -167,7 +180,20 @@ public final class AuthFlow implements Listener {
             }
         }
 
+        if (account != null
+                && account.trustedIpLoginEnabled()
+                && security.sessionTrustEnabled()
+                && ip != null
+                && ip.equals(trustedSessions.get(uuid))) {
+            authenticated.put(uuid, true);
+            // Renew the TTL so the trusted entry doesn't disappear mid-session if the
+            // player reconnected close to expiry.
+            scheduleTrustExpiry(uuid);
+            return;
+        }
+
         // ---- Captcha gate (new players + returning players whose verification expired) ----
+        boolean captchaPassed = false;
         if (captchaConfig.enabled() && captchaRequired(account, ip)) {
             // Global cap on simultaneously-waiting captcha challenges. Each one holds
             // a Paper async config-event thread for up to token-ttl-minutes, so without
@@ -185,7 +211,8 @@ public final class AuthFlow implements Listener {
             }
             try {
                 boolean welcome = (account == null);
-                String token = captchaService.issueToken(uuid, username, ip);
+                String token = captchaService.issueToken(
+                        uuid, username, captchaConfig.verifyClientIp() ? ip : null);
                 if (token == null) {
                     connectionTracker.release(ip, uuid);
                     conn.disconnect(messages.captchaIssueError());
@@ -224,6 +251,7 @@ public final class AuthFlow implements Listener {
                 }
                 // Captcha passed — close the captcha dialog so the next showDialog
                 // (login/register) opens cleanly on the client.
+                captchaPassed = true;
                 conn.getAudience().closeDialog();
             } finally {
                 if (tracked) captchaInflight.decrementAndGet();
@@ -233,6 +261,15 @@ public final class AuthFlow implements Listener {
         PendingSession session = account != null
                 ? PendingSession.forLogin(account.username(), account.hash(), ip)
                 : PendingSession.forRegister(username, ip);
+
+        int maxAuth = security.maxConcurrentAuthSessions();
+        boolean authTracked = maxAuth > 0;
+        if (authTracked && authInflight.incrementAndGet() > maxAuth) {
+            authInflight.decrementAndGet();
+            connectionTracker.release(ip, uuid);
+            conn.disconnect(messages.authServerBusy());
+            return;
+        }
 
         AuthResult timeoutResult = AuthResult.denied(messages.loginTimedOut());
         session.future().completeOnTimeout(timeoutResult, security.loginTimeoutMinutes(), TimeUnit.MINUTES);
@@ -247,20 +284,27 @@ public final class AuthFlow implements Listener {
             result = session.future().join();
         } finally {
             pending.remove(uuid);
+            if (authTracked) authInflight.decrementAndGet();
         }
 
         if (result.ok()) {
             authenticated.put(uuid, true);
-            if (security.sessionTrustEnabled() && ip != null) {
+            if (account != null
+                    && account.trustedIpLoginEnabled()
+                    && security.sessionTrustEnabled()
+                    && ip != null) {
                 trustedSessions.put(uuid, ip);
                 scheduleTrustExpiry(uuid);
+            } else if (security.sessionTrustEnabled() && trustHintShownThisRun.add(uuid)) {
+                trustHintPending.add(uuid);
             }
             try {
                 accounts.updateLastIp(uuid, ip);
             } catch (SQLException e) {
                 plugin.getSLF4JLogger().warn("Failed to record last IP for {}", uuid, e);
             }
-            if (captchaConfig.enabled()) {
+            if (captchaConfig.enabled()
+                    && (captchaPassed || captchaConfig.refreshVerificationOnLogin())) {
                 try {
                     accounts.touchCaptchaVerifiedAt(uuid, ip);
                 } catch (SQLException e) {
@@ -327,6 +371,14 @@ public final class AuthFlow implements Listener {
         });
         String ip = event.getIpAddress() == null ? null : event.getIpAddress().getHostAddress();
         connectionTracker.release(ip, uuid);
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        if (!trustHintPending.remove(uuid)) return;
+        if (!security.sessionTrustEnabled()) return;
+        event.getPlayer().sendMessage(messages.trustedIpLoginHint());
     }
 
     /**

@@ -18,9 +18,9 @@ database:
 
 security:
   # Per-session wrong-password attempts before the player is kicked from the login dialog.
-  max-attempts: 5
-  # IP-trusted session TTL. After a successful auth the player skips the dialog on reconnect
-  # from the same IP for this many minutes. Set to 0 to fully disable IP trust (always ask).
+  max-attempts: 3
+  # IP-trusted session TTL for players who explicitly enable fast login with /authsecurity trustip on.
+  # Set to 0 to fully disable the feature for everyone.
   session-ttl-minutes: 60
   # Time the player has to complete the login/register dialog before being kicked.
   login-timeout-minutes: 3
@@ -28,12 +28,15 @@ security:
   password-max-length: 72
   # Maximum number of distinct accounts that may be connected concurrently from the same IP.
   accounts-per-ip-limit: 3
+  # Maximum number of players that may wait on the login/register dialog at the same time.
+  # Set to 0 to disable the limit.
+  max-concurrent-auth-sessions: 100
 
   # Persistent per-IP lockout. Counts wrong-password attempts by source address so an
   # attacker can't lock out a victim's account by failing its password — only their
   # own IP gets banned. Survives reconnects within a server session.
   lockout:
-    enabled: true
+    enabled: false
     max-attempts: 5
     ban-minutes: 15
 
@@ -82,6 +85,11 @@ captcha:
   # How long a successful captcha is remembered for that account. After this many days the
   # player will be asked to pass captcha again on next connect. Set 0 to require it every time.
   verification-validity-days: 7
+  # If false, captcha_verified_at is updated only after a real captcha pass.
+  # If true, every successful login refreshes the captcha validity window.
+  refresh-verification-on-login: false
+  # If false, captcha token verification does not compare the web request IP with the Minecraft IP.
+  verify-client-ip: true
   # Re-prompt the captcha when the player's IP differs from the one used during the
   # last successful verification. Helps against session hijacks / cookie theft scenarios
   # where an attacker reuses an authenticated UUID from a different network. Disable for
@@ -92,6 +100,15 @@ captcha:
   # is the main defence against a botnet trying to exhaust your thread pool. Set to 0
   # to disable the limit (not recommended on a public server).
   max-concurrent-challenges: 50
+
+  # Reverse proxy support for nginx/Cloudflare tunnels/etc. Only enable this when the
+  # captcha web server is reachable through a proxy you control.
+  proxy:
+    enabled: false
+    trusted-ips:
+      - "127.0.0.1"
+      - "::1"
+    forwarded-for-header: "X-Forwarded-For"
 
   # Texts rendered into the captcha web page (https://<your-host>/c/<token>).
   # Plain text (NOT MiniMessage). Use YAML block scalar "|-" for multi-line
@@ -176,6 +193,12 @@ messages:
   command-logout-success: "<green>'<player>' has been logged out.</green>"
   command-logout-not-online: "<yellow>'<player>' is not online. Trusted session cleared.</yellow>"
   command-logout-kick: "<yellow>You have been logged out by an administrator.</yellow>"
+  command-trustip-enabled: "<green>Fast login from this IP is now enabled for your account.</green>"
+  command-trustip-disabled: "<yellow>Fast login from this IP is now disabled for your account.</yellow>"
+  command-trustip-unavailable: "<red>Fast login by IP is disabled by the server administrator.</red>"
+  trusted-ip-login-hint: "<gray>You can enable convenient fast login from this IP with <yellow>/authsecurity trustip on</yellow>. Only use it if this IP is not shared with other people.</gray>"
+  admin-password-changed-kick: "<yellow>Your password was changed by an administrator. Please reconnect to log in again.</yellow>"
+  admin-account-unregistered-kick: "<yellow>Your account was removed by an administrator. Please reconnect.</yellow>"
 
   command-reload-started: "<gray>Reloading AuthSecurity configuration…</gray>"
   command-reload-success: "<green>AuthSecurity configuration reloaded. Database settings require a server restart.</green>"
@@ -197,3 +220,4 @@ messages:
   captcha-button-disconnect: "<red>Disconnect</red>"
   captcha-issue-error: "<red>Failed to issue a verification link. Please reconnect.</red>"
   captcha-server-busy: "<red>The verification queue is full right now. Please try again in a minute.</red>"
+  auth-server-busy: "<red>Too many players are logging in right now. Please try again in a minute.</red>"

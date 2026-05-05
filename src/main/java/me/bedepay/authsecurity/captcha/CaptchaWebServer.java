@@ -46,7 +46,7 @@ public final class CaptchaWebServer {
                 if (path.startsWith("/c/")) path = "/c/[redacted]";
                 plugin.getSLF4JLogger().info(
                         "captcha-web {} \"{} {}\" {} {}ms",
-                        ctx.ip(), ctx.method(), path, ctx.status().getCode(), ms.longValue());
+                        clientIp(ctx), ctx.method(), path, ctx.status().getCode(), ms.longValue());
             });
         });
         app.get("/", ctx -> ctx.result("AuthSecurity captcha gate OK"));
@@ -104,7 +104,7 @@ public final class CaptchaWebServer {
             ctx.status(HttpStatus.BAD_REQUEST).result("bad token");
             return;
         }
-        String clientIp = ctx.ip();
+        String clientIp = captcha.config().verifyClientIp() ? clientIp(ctx) : null;
         // Async: releases the Jetty worker thread while we wait on Cloudflare's siteverify
         // (up to 10s). Without this, a flood of /verify with junk responses would saturate
         // the worker pool and starve legitimate requests.
@@ -123,6 +123,18 @@ public final class CaptchaWebServer {
         Matcher m = p.matcher(body);
         if (!m.find()) return null;
         return m.group(1).replace("\\\"", "\"").replace("\\\\", "\\");
+    }
+
+    private String clientIp(Context ctx) {
+        String remote = ctx.ip();
+        PluginConfig.CaptchaProxyConfig proxy = captcha.config().proxy();
+        if (proxy == null || !proxy.enabled()) return remote;
+        if (remote == null || !proxy.trustedIps().contains(remote)) return remote;
+
+        String header = ctx.header(proxy.forwardedForHeader());
+        if (header == null || header.isBlank()) return remote;
+        String first = header.split(",", 2)[0].trim();
+        return first.isBlank() ? remote : first;
     }
 
     private static String escapeAttr(String value) {

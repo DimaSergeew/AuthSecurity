@@ -139,7 +139,8 @@ public final class HikariAccountRepository implements AccountRepository {
                 rs.getTimestamp("created_at"),
                 rs.getTimestamp("updated_at"),
                 rs.getTimestamp("captcha_verified_at"),
-                rs.getString("captcha_verified_ip")
+                rs.getString("captcha_verified_ip"),
+                rs.getBoolean("trusted_ip_login_enabled")
         );
     }
 
@@ -190,6 +191,16 @@ public final class HikariAccountRepository implements AccountRepository {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.touchCaptchaVerified())) {
             ps.setString(1, ip);
+            ps.setString(2, uuid.toString());
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void updateTrustedIpLoginEnabled(UUID uuid, boolean enabled) throws SQLException {
+        try (Connection c = pool.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql.updateTrustedIpLogin())) {
+            ps.setBoolean(1, enabled);
             ps.setString(2, uuid.toString());
             ps.executeUpdate();
         }

@@ -6,6 +6,8 @@ import me.bedepay.authsecurity.config.Messages;
 import me.bedepay.authsecurity.storage.Account;
 import me.bedepay.authsecurity.storage.AccountRepository;
 import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.incendo.cloud.annotations.Argument;
@@ -61,30 +63,41 @@ public final class AdminCommands {
     @Permission(PERM_LOGOUT)
     public void logout(CommandSourceStack source,
                        @Argument(value = "player", suggestions = AuthCommands.SUGGEST_PLAYERS) String player) {
-        Audience audience = source.getSender();
+        CommandSender sender = source.getSender();
+        plugin.getServer().getAsyncScheduler().runNow(plugin, $ -> {
+            try {
+                Account account = accounts.findByUsername(player);
+                if (account == null) {
+                    runForSender(sender, () -> sender.sendMessage(messages.commandPlayerNotFound(player)));
+                    return;
+                }
 
-        Account account;
-        try {
-            account = accounts.findByUsername(player);
-        } catch (SQLException e) {
-            plugin.getSLF4JLogger().error("/authsecurity logout {} failed", player, e);
-            audience.sendMessage(messages.internalError());
-            return;
-        }
-        if (account == null) {
-            audience.sendMessage(messages.commandPlayerNotFound(player));
-            return;
-        }
+                authFlow.invalidate(account.uuid());
+                Player online = plugin.getServer().getPlayer(account.uuid());
+                if (online != null) {
+                    kick(online, messages.commandLogoutKick());
+                    runForSender(sender, () -> sender.sendMessage(messages.commandLogoutSuccess(account.username())));
+                } else {
+                    runForSender(sender, () -> sender.sendMessage(messages.commandLogoutNotOnline(account.username())));
+                }
+                plugin.getSLF4JLogger().info("Logged out {} ({}), requester={}",
+                        account.username(), account.uuid(), sender.getName());
+            } catch (SQLException e) {
+                plugin.getSLF4JLogger().error("/authsecurity logout {} failed", player, e);
+                runForSender(sender, () -> sender.sendMessage(messages.internalError()));
+            }
+        });
+    }
 
-        authFlow.invalidate(account.uuid());
-        Player online = plugin.getServer().getPlayer(account.uuid());
-        if (online != null) {
-            online.getScheduler().run(plugin, $ -> online.kick(messages.commandLogoutKick()), null);
-            audience.sendMessage(messages.commandLogoutSuccess(account.username()));
+    private void runForSender(CommandSender sender, Runnable action) {
+        if (sender instanceof Player player) {
+            player.getScheduler().run(plugin, $ -> action.run(), null);
         } else {
-            audience.sendMessage(messages.commandLogoutNotOnline(account.username()));
+            plugin.getServer().getGlobalRegionScheduler().run(plugin, $ -> action.run());
         }
-        plugin.getSLF4JLogger().info("Logged out {} ({}), requester={}",
-                account.username(), account.uuid(), source.getSender().getName());
+    }
+
+    private void kick(Player player, Component reason) {
+        player.getScheduler().run(plugin, $ -> player.kick(reason), null);
     }
 }

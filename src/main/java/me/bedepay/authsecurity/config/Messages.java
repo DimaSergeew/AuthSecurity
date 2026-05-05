@@ -71,6 +71,12 @@ public record Messages(
         String commandLogoutSuccess,
         String commandLogoutNotOnline,
         Component commandLogoutKick,
+        Component commandTrustIpEnabled,
+        Component commandTrustIpDisabled,
+        Component commandTrustIpUnavailable,
+        Component trustedIpLoginHint,
+        Component adminPasswordChangedKick,
+        Component adminAccountUnregisteredKick,
 
         Component commandReloadStarted,
         Component commandReloadSuccess,
@@ -84,7 +90,8 @@ public record Messages(
         Component captchaButtonDiscord,
         Component captchaButtonDisconnect,
         Component captchaIssueError,
-        Component captchaServerBusy
+        Component captchaServerBusy,
+        Component authServerBusy
 ) {
     private static final MiniMessage MM = MiniMessage.miniMessage();
 

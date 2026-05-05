@@ -25,7 +25,8 @@ public record SqlBundle(
         String isCaptchaVerified,
         String markCaptchaVerified,
         String deleteExpiredCaptcha,
-        String touchCaptchaVerified
+        String touchCaptchaVerified,
+        String updateTrustedIpLogin
 ) {
     public List<String> schemaStatements() {
         return Arrays.stream(schema.split(";"))
@@ -47,7 +48,8 @@ public record SqlBundle(
                 read(dialect, "is_captcha_verified.sql"),
                 read(dialect, "mark_captcha_verified.sql"),
                 read(dialect, "delete_expired_captcha.sql"),
-                read(dialect, "touch_captcha_verified.sql")
+                read(dialect, "touch_captcha_verified.sql"),
+                read(dialect, "update_trusted_ip_login.sql")
         );
     }
 

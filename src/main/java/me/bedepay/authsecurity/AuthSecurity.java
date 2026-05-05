@@ -33,7 +33,14 @@ public final class AuthSecurity extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        PluginConfig config = ConfigLoader.load(this);
+        PluginConfig config;
+        try {
+            config = ConfigLoader.load(this);
+        } catch (Exception e) {
+            getSLF4JLogger().error("Fatal: invalid AuthSecurity config.yml — fix the config and restart the server", e);
+            getServer().shutdown();
+            return;
+        }
 
         try {
             accounts = HikariAccountRepository.create(config.database(), getDataFolder());
@@ -56,8 +63,13 @@ public final class AuthSecurity extends JavaPlugin {
                 captchaWebServer.start();
                 captchaService.startCleanup();
             } catch (Exception e) {
-                getSLF4JLogger().error("Failed to start captcha web server — captcha will be disabled this session", e);
-                captchaWebServer = null;
+                getSLF4JLogger().error("""
+                        Fatal: captcha is enabled, but the captcha web server failed to start.
+                        Check captcha.web-bind, captcha.web-port and whether the port is already used.
+                        Server will shut down to avoid a broken authentication flow.
+                        """, e);
+                getServer().shutdown();
+                return;
             }
         }
 

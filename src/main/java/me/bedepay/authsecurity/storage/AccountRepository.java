@@ -35,6 +35,8 @@ public interface AccountRepository extends AutoCloseable {
 
     void touchCaptchaVerifiedAt(UUID uuid, String ip) throws SQLException;
 
+    void updateTrustedIpLoginEnabled(UUID uuid, boolean enabled) throws SQLException;
+
     @Override
     void close();
 }
