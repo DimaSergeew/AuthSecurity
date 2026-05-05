@@ -115,97 +115,97 @@ captcha:
   # status messages — real newlines become line breaks on the page.
   # To translate the page, just override the strings below.
   web-texts:
-    lang: "en"
-    title: "PinkyFoxy — Anti-bot Verification"
+    lang: "ru"
+    title: "PinkyFoxy — Проверка от ботов"
     brand: "PINKY FOXY"
-    tagline: "~ Anti-bot Verification ~"
-    heading: "Prove you are not a bot"
+    tagline: "~ Проверка от ботов ~"
+    heading: "Подтвердите, что вы не бот"
     intro: |-
-      Complete the check below to enter the server.
-      When it succeeds you can close this tab — Minecraft will continue automatically.
-    hint: "If the widget doesn't load, make sure JavaScript is enabled and Cloudflare is reachable."
-    footer: "© PinkyFoxy · Powered by Cloudflare Turnstile"
-    status-verifying: "Verifying..."
+      Пройдите проверку ниже, чтобы войти на сервер.
+      После успешной проверки вкладку можно закрыть — Minecraft продолжит вход автоматически.
+    hint: "Если виджет не загрузился, проверьте, что включен JavaScript и доступен Cloudflare."
+    footer: "© PinkyFoxy · Проверка Cloudflare Turnstile"
+    status-verifying: "Проверяем..."
     status-verified: |-
-      VERIFIED!
-      You can close this tab and return to Minecraft.
-      The login screen will appear automatically.
+      ПРОВЕРКА ПРОЙДЕНА!
+      Вкладку можно закрыть и вернуться в Minecraft.
+      Окно входа появится автоматически.
     status-failed: |-
-      Verification failed.
-      Please try again.
+      Проверка не пройдена.
+      Попробуйте еще раз.
     status-network: |-
-      Network error.
-      Check your connection and try again.
+      Ошибка сети.
+      Проверьте подключение и попробуйте снова.
     status-widget-error: |-
-      Captcha widget error.
-      Please refresh the page.
+      Ошибка виджета captcha.
+      Обновите страницу.
 
 messages:
-  login-title: "<gold>🔐 Login</gold>"
-  login-welcome: "<gray>Welcome back, <yellow><username></yellow>! Enter your password.</gray>"
-  login-button: "<green>Login</green>"
-  forgot-password-button: "<yellow>Forgot password?</yellow>"
-  register-title: "<aqua>📝 Register</aqua>"
-  register-welcome: "<gray>Hello <yellow><username></yellow>! Create a password.</gray>"
-  register-button: "<green>Register</green>"
-  cancel-button: "<red>Cancel</red>"
-  password-label: "<white>Password</white>"
-  password-confirm-label: "<white>Confirm password</white>"
-  wrong-password: "<red>Wrong password — <remaining> attempt(s) left.</red>"
-  too-many-attempts: "<red>Too many failed attempts.</red>"
-  login-cancelled: "<yellow>Login cancelled.</yellow>"
-  login-timed-out: "<yellow>Login timed out. Please reconnect.</yellow>"
-  internal-error: "<red>Internal server error.</red>"
-  password-empty: "<red>Password cannot be empty.</red>"
-  password-too-short: "<red>Password must be at least <min> characters.</red>"
-  password-too-long: "<red>Password must be at most <max> characters.</red>"
-  passwords-mismatch: "<red>Passwords do not match.</red>"
-  uuid-missing: "<red>Could not determine your UUID.</red>"
-  ip-limit-reached: "<red>Too many accounts connected from your IP address (limit: <limit>).</red>"
-  account-locked: "<red>Too many failed attempts. Account locked for <minutes> minute(s).</red>"
-  wrong-username-case: "<red>Your registered name is '<correct>'. Please reconnect with the correct spelling.</red>"
-  name-already-registered: "<red>The name '<name>' is already registered to a different account. Please contact a server administrator.</red>"
-  idle-kick: "<yellow>Kicked for inactivity. Please log in again.</yellow>"
-  password-requires-alphanumeric: "<red>Password must contain at least one letter and one digit.</red>"
+  login-title: "<gold>🔐 Вход</gold>"
+  login-welcome: "<gray>С возвращением, <yellow><username></yellow>! Введите пароль.</gray>"
+  login-button: "<green>Войти</green>"
+  forgot-password-button: "<yellow>Забыли пароль?</yellow>"
+  register-title: "<aqua>📝 Регистрация</aqua>"
+  register-welcome: "<gray>Привет, <yellow><username></yellow>! Придумайте пароль.</gray>"
+  register-button: "<green>Зарегистрироваться</green>"
+  cancel-button: "<red>Отмена</red>"
+  password-label: "<white>Пароль</white>"
+  password-confirm-label: "<white>Повторите пароль</white>"
+  wrong-password: "<red>Неверный пароль. Осталось попыток: <remaining>.</red>"
+  too-many-attempts: "<red>Слишком много неверных попыток.</red>"
+  login-cancelled: "<yellow>Вход отменен.</yellow>"
+  login-timed-out: "<yellow>Время входа истекло. Перезайдите на сервер.</yellow>"
+  internal-error: "<red>Внутренняя ошибка сервера.</red>"
+  password-empty: "<red>Пароль не может быть пустым.</red>"
+  password-too-short: "<red>Пароль должен быть не короче <min> символов.</red>"
+  password-too-long: "<red>Пароль должен быть не длиннее <max> символов.</red>"
+  passwords-mismatch: "<red>Пароли не совпадают.</red>"
+  uuid-missing: "<red>Не удалось определить ваш UUID.</red>"
+  ip-limit-reached: "<red>С вашего IP уже подключено слишком много аккаунтов (лимит: <limit>).</red>"
+  account-locked: "<red>Слишком много неверных попыток. Вход заблокирован на <minutes> мин.</red>"
+  wrong-username-case: "<red>Ваш ник зарегистрирован как '<correct>'. Перезайдите с правильным регистром.</red>"
+  name-already-registered: "<red>Ник '<name>' уже привязан к другому аккаунту. Обратитесь к администратору.</red>"
+  idle-kick: "<yellow>Вы были отключены за бездействие. Войдите снова.</yellow>"
+  password-requires-alphanumeric: "<red>Пароль должен содержать хотя бы одну букву и одну цифру.</red>"
 
-  forgot-password-title: "<gold>🔑 Recover your account</gold>"
-  forgot-password-body: "<gray>Please open a ticket on our Discord server and a staff member will help you recover access to your account.\nOur team will verify your identity before any password is reset.</gray>"
-  forgot-password-discord-button: "<blue>Open Discord invite</blue>"
-  forgot-password-back-button: "<gray>Back</gray>"
+  forgot-password-title: "<gold>🔑 Восстановление доступа</gold>"
+  forgot-password-body: "<gray>Откройте тикет в нашем Discord, и администрация поможет восстановить доступ.\nПеред сбросом пароля мы проверим, что аккаунт действительно ваш.</gray>"
+  forgot-password-discord-button: "<blue>Открыть Discord</blue>"
+  forgot-password-back-button: "<gray>Назад</gray>"
 
-  change-password-title: "<gold>🔑 Change password</gold>"
-  change-password-body: "<gray>Enter your current password followed by the new one.</gray>"
-  change-password-old-label: "<white>Current password</white>"
-  change-password-new-label: "<white>New password</white>"
-  change-password-confirm-label: "<white>Confirm new password</white>"
-  change-password-button: "<green>Save</green>"
-  change-password-success: "<green>Your password has been updated.</green>"
-  change-password-wrong-old: "<red>Your current password is incorrect.</red>"
+  change-password-title: "<gold>🔑 Смена пароля</gold>"
+  change-password-body: "<gray>Введите текущий пароль, затем новый пароль.</gray>"
+  change-password-old-label: "<white>Текущий пароль</white>"
+  change-password-new-label: "<white>Новый пароль</white>"
+  change-password-confirm-label: "<white>Повторите новый пароль</white>"
+  change-password-button: "<green>Сохранить</green>"
+  change-password-success: "<green>Пароль успешно изменен.</green>"
+  change-password-wrong-old: "<red>Текущий пароль введен неверно.</red>"
 
-  command-only-players: "<red>Only players can run this command.</red>"
-  command-not-authenticated: "<red>You are not logged in.</red>"
-  command-player-not-found: "<red>No account registered for '<player>'.</red>"
-  command-unregister-success: "<green>Account '<player>' has been removed.</green>"
-  command-changepassword-admin-success: "<green>Password for '<player>' has been updated.</green>"
-  command-accountinfo-header: "<gold>Account info for <player></gold>"
+  command-only-players: "<red>Эту команду может выполнить только игрок.</red>"
+  command-not-authenticated: "<red>Вы еще не вошли в аккаунт.</red>"
+  command-player-not-found: "<red>Аккаунт '<player>' не найден.</red>"
+  command-unregister-success: "<green>Аккаунт '<player>' удален.</green>"
+  command-changepassword-admin-success: "<green>Пароль для '<player>' изменен.</green>"
+  command-accountinfo-header: "<gold>Информация об аккаунте <player></gold>"
   command-accountinfo-line: "<gray><key>:</gray> <white><value></white>"
-  command-no-permission: "<red>You do not have permission to use this command.</red>"
-  command-logout-success: "<green>'<player>' has been logged out.</green>"
-  command-logout-not-online: "<yellow>'<player>' is not online. Trusted session cleared.</yellow>"
-  command-logout-kick: "<yellow>You have been logged out by an administrator.</yellow>"
-  command-trustip-enabled: "<green>Fast login from this IP is now enabled for your account.</green>"
-  command-trustip-disabled: "<yellow>Fast login from this IP is now disabled for your account.</yellow>"
-  command-trustip-unavailable: "<red>Fast login by IP is disabled by the server administrator.</red>"
-  trusted-ip-login-hint: "<gray>You can enable convenient fast login from this IP with <yellow>/authsecurity trustip on</yellow>. Only use it if this IP is not shared with other people.</gray>"
-  admin-password-changed-kick: "<yellow>Your password was changed by an administrator. Please reconnect to log in again.</yellow>"
-  admin-account-unregistered-kick: "<yellow>Your account was removed by an administrator. Please reconnect.</yellow>"
+  command-no-permission: "<red>У вас нет прав для этой команды.</red>"
+  command-logout-success: "<green>Игрок '<player>' выведен из аккаунта.</green>"
+  command-logout-not-online: "<yellow>Игрок '<player>' не онлайн. Быстрая сессия сброшена.</yellow>"
+  command-logout-kick: "<yellow>Администратор вывел вас из аккаунта.</yellow>"
+  command-trustip-enabled: "<green>Быстрый вход с этого IP включен для вашего аккаунта.</green>"
+  command-trustip-disabled: "<yellow>Быстрый вход с этого IP отключен для вашего аккаунта.</yellow>"
+  command-trustip-unavailable: "<red>Быстрый вход по IP отключен администратором сервера.</red>"
+  trusted-ip-login-hint: "<gray>Можно включить удобный быстрый вход с этого IP командой <yellow>/authsecurity trustip on</yellow>. Используйте это только если вашим IP не пользуются другие люди.</gray>"
+  admin-password-changed-kick: "<yellow>Ваш пароль был изменен администратором. Пожалуйста, перезайдите на сервер.</yellow>"
+  admin-account-unregistered-kick: "<yellow>Ваш аккаунт был удален администратором. Пожалуйста, перезайдите на сервер.</yellow>"
 
-  command-reload-started: "<gray>Reloading AuthSecurity configuration…</gray>"
-  command-reload-success: "<green>AuthSecurity configuration reloaded. Database settings require a server restart.</green>"
-  command-reload-failed: "<red>Reload failed — see server log.</red>"
+  command-reload-started: "<gray>Перезагружаю конфигурацию AuthSecurity...</gray>"
+  command-reload-success: "<green>Конфигурация AuthSecurity перезагружена. Настройки базы данных требуют полного рестарта сервера.</green>"
+  command-reload-failed: "<red>Не удалось перезагрузить конфигурацию. Подробности в консоли.</red>"
 
-  captcha-welcome-title: "<gold>🛡 Anti-bot verification</gold>"
-  captcha-renewal-title: "<gold>🛡 Verification required</gold>"
+  captcha-welcome-title: "<gold>🛡 Проверка от ботов</gold>"
+  captcha-renewal-title: "<gold>🛡 Требуется проверка</gold>"
   # Captcha dialog body. The verification URL is exposed via the "Open captcha" button
   # below — do NOT inline it as <url> in the body, the dialog will compress long links
   # and look ugly. The dialog auto-closes the moment Cloudflare confirms the captcha,
@@ -213,11 +213,11 @@ messages:
   # to come back into Minecraft and click anything.
   # Note about regional restrictions: Cloudflare's verification endpoint is unreachable
   # from a few regions due to sanctions; in that case players need a VPN.
-  captcha-welcome-body: "<gray>Welcome, <yellow><username></yellow>!\n\nThis is your <yellow>first time</yellow> on this server. To protect us from bots, please complete a quick <green>one-time anti-bot check</green>.\n\n<white>Press <yellow>Open captcha</yellow> below — the verification page will open in your browser. You'll <green>automatically return</green> to registration the moment the check succeeds — no need to click anything in Minecraft.</white>\n\n<gray><italic>Heads up: in some regions Cloudflare's check is blocked due to sanctions. If the page does not load, please use a <yellow>VPN</yellow>. If anything else goes wrong — press <yellow>Discord help</yellow> and our team will sort it out.</italic></gray>"
-  captcha-renewal-body: "<gray>Hey <yellow><username></yellow>! Your previous verification has expired (or you're connecting from a new IP), so we need to confirm you're still a human.\n\n<white>Press <yellow>Open captcha</yellow> below — the verification page will open in your browser. You'll <green>automatically continue</green> the moment the check succeeds.</white>\n\n<gray><italic>Heads up: in some regions Cloudflare's check is blocked due to sanctions. If the page does not load, please use a <yellow>VPN</yellow>. If you need help, press <yellow>Discord help</yellow>.</italic></gray>"
-  captcha-button-open: "<green>Open captcha</green>"
-  captcha-button-discord: "<aqua>Discord help</aqua>"
-  captcha-button-disconnect: "<red>Disconnect</red>"
-  captcha-issue-error: "<red>Failed to issue a verification link. Please reconnect.</red>"
-  captcha-server-busy: "<red>The verification queue is full right now. Please try again in a minute.</red>"
-  auth-server-busy: "<red>Too many players are logging in right now. Please try again in a minute.</red>"
+  captcha-welcome-body: "<gray>Привет, <yellow><username></yellow>!\n\nВы впервые заходите на сервер. Чтобы защититься от ботов, пройдите короткую <green>одноразовую проверку</green>.\n\n<white>Нажмите <yellow>Открыть captcha</yellow> ниже — страница проверки откроется в браузере. После успешной проверки регистрация появится автоматически, нажимать что-то в Minecraft не нужно.</white>\n\n<gray><italic>Если страница не открывается, возможно Cloudflare недоступен в вашем регионе. Попробуйте VPN или нажмите <yellow>Помощь Discord</yellow>.</italic></gray>"
+  captcha-renewal-body: "<gray>Привет, <yellow><username></yellow>!\n\nСрок прошлой проверки истек или вы заходите с нового IP, поэтому нужно еще раз подтвердить, что вы не бот.\n\n<white>Нажмите <yellow>Открыть captcha</yellow> ниже — страница проверки откроется в браузере. После успешной проверки вход продолжится автоматически.</white>\n\n<gray><italic>Если страница не открывается, попробуйте VPN или нажмите <yellow>Помощь Discord</yellow>.</italic></gray>"
+  captcha-button-open: "<green>Открыть captcha</green>"
+  captcha-button-discord: "<aqua>Помощь Discord</aqua>"
+  captcha-button-disconnect: "<red>Отключиться</red>"
+  captcha-issue-error: "<red>Не удалось создать ссылку проверки. Перезайдите на сервер.</red>"
+  captcha-server-busy: "<red>Очередь проверки сейчас заполнена. Попробуйте через минуту.</red>"
+  auth-server-busy: "<red>Слишком много игроков сейчас проходит вход. Попробуйте через минуту.</red>"

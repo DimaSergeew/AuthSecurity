@@ -177,19 +177,19 @@ public final class ConfigLoader {
 
     private static PluginConfig.CaptchaWebTexts defaultWebTexts() {
         return new PluginConfig.CaptchaWebTexts(
-                "en",
-                "PinkyFoxy — Anti-bot Verification",
+                "ru",
+                "PinkyFoxy — Проверка от ботов",
                 "PINKY FOXY",
-                "~ Anti-bot Verification ~",
-                "Prove you are not a bot",
-                "Complete the check below to enter the server.\nWhen it succeeds you can close this tab — Minecraft will continue automatically.",
-                "If the widget doesn't load, make sure JavaScript is enabled and Cloudflare is reachable.",
-                "© PinkyFoxy · Powered by Cloudflare Turnstile",
-                "Verifying...",
-                "VERIFIED!\nYou can close this tab and return to Minecraft.\nThe login screen will appear automatically.",
-                "Verification failed.\nPlease try again.",
-                "Network error.\nCheck your connection and try again.",
-                "Captcha widget error.\nPlease refresh the page."
+                "~ Проверка от ботов ~",
+                "Подтвердите, что вы не бот",
+                "Пройдите проверку ниже, чтобы войти на сервер.\nПосле успешной проверки вкладку можно закрыть — Minecraft продолжит вход автоматически.",
+                "Если виджет не загрузился, проверьте, что включен JavaScript и доступен Cloudflare.",
+                "© PinkyFoxy · Проверка Cloudflare Turnstile",
+                "Проверяем...",
+                "ПРОВЕРКА ПРОЙДЕНА!\nВкладку можно закрыть и вернуться в Minecraft.\nОкно входа появится автоматически.",
+                "Проверка не пройдена.\nПопробуйте еще раз.",
+                "Ошибка сети.\nПроверьте подключение и попробуйте снова.",
+                "Ошибка виджета captcha.\nОбновите страницу."
         );
     }
 

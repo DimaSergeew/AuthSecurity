@@ -90,7 +90,7 @@ public final class Dialogs {
         return Dialog.create(f -> f.empty()
                 .base(DialogBase.builder(m.forgotPasswordTitle())
                         .canCloseWithEscape(true)
-                        .body(List.of(DialogBody.plainMessage(m.forgotPasswordBody(), 512)))
+                        .body(List.of(DialogBody.plainMessage(m.forgotPasswordBody(), 256)))
                         .build())
                 .type(DialogType.multiAction(buttons).columns(buttons.size()).build()));
     }
@@ -155,9 +155,9 @@ public final class Dialogs {
     }
 
     private static List<DialogBody> body(Component main, Component error) {
-        DialogBody first = DialogBody.plainMessage(main, 512);
+        DialogBody first = DialogBody.plainMessage(main, 256);
         if (error == null) return List.of(first);
-        return List.of(first, DialogBody.plainMessage(error, 512));
+        return List.of(first, DialogBody.plainMessage(error, 256));
     }
 
     private static DialogInput textInput(String key, Component label) {
