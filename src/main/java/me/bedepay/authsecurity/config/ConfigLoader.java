@@ -20,18 +20,17 @@ import java.util.List;
  */
 public final class ConfigLoader {
 
+    private static final int CONFIG_VERSION = 2;
+
     private ConfigLoader() {}
 
     public static PluginConfig load(Plugin plugin) {
         plugin.getDataFolder().mkdirs();
         File target = new File(plugin.getDataFolder(), "config.yml");
         if (!target.exists()) {
-            try (InputStream in = plugin.getResource("config.yml")) {
-                if (in == null) throw new IllegalStateException("config.yml missing from plugin jar");
-                Files.copy(in, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                throw new IllegalStateException("Failed to write default config.yml", e);
-            }
+            copyDefaultConfig(plugin, target);
+        } else {
+            rotateOutdatedConfig(plugin, target);
         }
 
         FileConfiguration yml = YamlConfiguration.loadConfiguration(target);
@@ -47,6 +46,42 @@ public final class ConfigLoader {
         );
         validate(config);
         return config;
+    }
+
+    private static void rotateOutdatedConfig(Plugin plugin, File target) {
+        FileConfiguration existing = YamlConfiguration.loadConfiguration(target);
+        int existingVersion = existing.getInt("config-version", 0);
+        if (existingVersion == CONFIG_VERSION) return;
+
+        File backup = nextBackupFile(target);
+        try {
+            Files.move(target.toPath(), backup.toPath());
+            copyDefaultConfig(plugin, target);
+            plugin.getSLF4JLogger().warn(
+                    "AuthSecurity config.yml was updated from version {} to {}. Old config saved as {}",
+                    existingVersion, CONFIG_VERSION, backup.getName());
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to rotate outdated config.yml to " + backup.getName(), e);
+        }
+    }
+
+    private static File nextBackupFile(File target) {
+        File dir = target.getParentFile();
+        File backup = new File(dir, target.getName() + ".old");
+        int index = 1;
+        while (backup.exists()) {
+            backup = new File(dir, target.getName() + ".old." + index++);
+        }
+        return backup;
+    }
+
+    private static void copyDefaultConfig(Plugin plugin, File target) {
+        try (InputStream in = plugin.getResource("config.yml")) {
+            if (in == null) throw new IllegalStateException("config.yml missing from plugin jar");
+            Files.copy(in, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to write default config.yml", e);
+        }
     }
 
     private static FileConfiguration loadBundledDefaults(Plugin plugin) {

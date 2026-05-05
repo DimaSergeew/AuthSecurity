@@ -1,3 +1,5 @@
+config-version: 2
+
 database:
   # Accepted values: "h2" or "mariadb"
   type: "h2"
