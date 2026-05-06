@@ -60,6 +60,8 @@
 | `/changepassword <player> <newpass>` | Принудительная смена пароля. | `authsecurity.admin.changepassword` | op |
 | `/unregister <player>` | Удалить регистрацию. | `authsecurity.admin.unregister` | op |
 | `/accountinfo <player>` | UUID, IP, даты создания/обновления. | `authsecurity.admin.accountinfo` | op |
+| `/authsecurity trustip off` | Отключить быстрый вход с текущего IP. | - | all |
+| `/authsecurity trustip on` | Включить быстрый вход обратно. | - | all |
 | `/authsecurity reload` | Перечитать конфиг без рестарта. | `authsecurity.admin.reload` | op |
 | `/authsecurity logout <player>` | Разлогинить + инвалидировать trust. | `authsecurity.admin.logout` | op |
 
@@ -92,7 +94,7 @@ database:
 
 security:
   max-attempts: 5               # попыток за сессию диалога
-  session-ttl-minutes: 60       # TTL trusted-сессии (0 = всегда спрашивать)
+  session-ttl-minutes: 30       # TTL trusted-сессии; включена по умолчанию (0 = всегда спрашивать)
   login-timeout-minutes: 3      # таймаут диалога
   password-min-length: 6
   password-max-length: 72

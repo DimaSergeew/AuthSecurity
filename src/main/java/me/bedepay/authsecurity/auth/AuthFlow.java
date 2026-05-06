@@ -288,14 +288,14 @@ public final class AuthFlow implements Listener {
 
         if (result.ok()) {
             authenticated.put(uuid, true);
-            if (account != null
-                    && account.trustedIpLoginEnabled()
+            if (trustedIpEnabledFor(account)
                     && security.sessionTrustEnabled()
                     && ip != null) {
                 trustedSessions.put(uuid, ip);
                 scheduleTrustExpiry(uuid);
-            } else if (security.sessionTrustEnabled() && trustHintShownThisRun.add(uuid)) {
-                trustHintPending.add(uuid);
+                if (trustHintShownThisRun.add(uuid)) {
+                    trustHintPending.add(uuid);
+                }
             }
             try {
                 accounts.updateLastIp(uuid, ip);
@@ -377,7 +377,7 @@ public final class AuthFlow implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         if (!trustHintPending.remove(uuid)) return;
         if (!security.sessionTrustEnabled()) return;
-        event.getPlayer().sendMessage(messages.trustedIpLoginHint());
+        event.getPlayer().sendMessage(messages.trustedIpLoginHint(security.sessionTtlMinutes()));
     }
 
     /**
@@ -499,6 +499,10 @@ public final class AuthFlow implements Listener {
             if (ip == null || !verifiedIp.equals(ip)) return true;
         }
         return false;
+    }
+
+    private static boolean trustedIpEnabledFor(Account account) {
+        return account == null || account.trustedIpLoginEnabled();
     }
 
     private String buildCaptchaUrl(String token) {

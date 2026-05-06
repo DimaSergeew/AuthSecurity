@@ -74,7 +74,7 @@ public record Messages(
         Component commandTrustIpEnabled,
         Component commandTrustIpDisabled,
         Component commandTrustIpUnavailable,
-        Component trustedIpLoginHint,
+        String trustedIpLoginHint,
         Component adminPasswordChangedKick,
         Component adminAccountUnregisteredKick,
 
@@ -167,6 +167,10 @@ public record Messages(
         return render(commandAccountInfoLine,
                 Placeholder.unparsed("key", key),
                 Placeholder.unparsed("value", value));
+    }
+
+    public Component trustedIpLoginHint(long minutes) {
+        return render(trustedIpLoginHint, Placeholder.unparsed("minutes", Long.toString(minutes)));
     }
 
     public Component captchaWelcomeBody(String username) {

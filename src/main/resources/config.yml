@@ -1,4 +1,4 @@
-config-version: 3
+config-version: 4
 
 database:
   # Accepted values: "h2" or "mariadb"
@@ -21,9 +21,9 @@ database:
 security:
   # Per-session wrong-password attempts before the player is kicked from the login dialog.
   max-attempts: 3
-  # IP-trusted session TTL for players who explicitly enable fast login with /authsecurity trustip on.
+  # IP-trusted session TTL. Fast login is enabled by default; players can opt out with /authsecurity trustip off.
   # Set to 0 to fully disable the feature for everyone.
-  session-ttl-minutes: 60
+  session-ttl-minutes: 30
   # Time the player has to complete the login/register dialog before being kicked.
   login-timeout-minutes: 3
   password-min-length: 6
@@ -187,7 +187,7 @@ messages:
   command-trustip-enabled: "<green>Быстрый вход с этого IP включен для вашего аккаунта.</green>"
   command-trustip-disabled: "<yellow>Быстрый вход с этого IP отключен для вашего аккаунта.</yellow>"
   command-trustip-unavailable: "<red>Быстрый вход по IP отключен администратором сервера.</red>"
-  trusted-ip-login-hint: "<gray>Можно включить удобный быстрый вход с этого IP командой <yellow>/authsecurity trustip on</yellow>. Используйте это только если вашим IP не пользуются другие люди.</gray>"
+  trusted-ip-login-hint: "<gray>Быстрый вход с этого IP включен на <yellow><minutes> минут</yellow>. Для повышения безопасности вы можете отключить его командой <yellow>/authsecurity trustip off</yellow>.</gray>"
   admin-password-changed-kick: "<yellow>Ваш пароль был изменен администратором. Пожалуйста, перезайдите на сервер.</yellow>"
   admin-account-unregistered-kick: "<yellow>Ваш аккаунт был удален администратором. Пожалуйста, перезайдите на сервер.</yellow>"
 

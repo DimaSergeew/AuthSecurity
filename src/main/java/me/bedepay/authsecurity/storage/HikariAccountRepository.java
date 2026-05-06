@@ -199,7 +199,8 @@ public final class HikariAccountRepository implements AccountRepository {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.updateTrustedIpLogin())) {
             ps.setBoolean(1, enabled);
-            ps.setString(2, uuid.toString());
+            ps.setBoolean(2, enabled);
+            ps.setString(3, uuid.toString());
             ps.executeUpdate();
         }
     }

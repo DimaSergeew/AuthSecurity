@@ -20,7 +20,7 @@ import java.util.List;
  */
 public final class ConfigLoader {
 
-    private static final int CONFIG_VERSION = 3;
+    private static final int CONFIG_VERSION = 4;
 
     private ConfigLoader() {}
 
@@ -127,7 +127,7 @@ public final class ConfigLoader {
 
     private static PluginConfig.SecurityConfig readSecurity(ConfigurationSection s) {
         long ttlMinutes = s.contains("session-ttl-minutes")
-                ? s.getLong("session-ttl-minutes", 60L)
+                ? s.getLong("session-ttl-minutes", 30L)
                 : s.getLong("session-ttl-hours", 1L) * 60L;
 
         ConfigurationSection lockoutSec = s.getConfigurationSection("lockout");
@@ -283,7 +283,7 @@ public final class ConfigLoader {
                 Messages.parse(s.getString("command-trustip-enabled", "")),
                 Messages.parse(s.getString("command-trustip-disabled", "")),
                 Messages.parse(s.getString("command-trustip-unavailable", "")),
-                Messages.parse(s.getString("trusted-ip-login-hint", "")),
+                s.getString("trusted-ip-login-hint", ""),
                 Messages.parse(s.getString("admin-password-changed-kick", "")),
                 Messages.parse(s.getString("admin-account-unregistered-kick", "")),
                 Messages.parse(s.getString("command-reload-started", "")),

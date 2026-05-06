@@ -8,12 +8,15 @@ CREATE TABLE IF NOT EXISTS accounts (
     updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     captcha_verified_at TIMESTAMP    NULL,
     captcha_verified_ip VARCHAR(64)  NULL,
-    trusted_ip_login_enabled BOOLEAN NOT NULL DEFAULT FALSE
+    trusted_ip_login_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    trusted_ip_login_opt_out BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS captcha_verified_at TIMESTAMP NULL;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS captcha_verified_ip VARCHAR(64) NULL;
-ALTER TABLE accounts ADD COLUMN IF NOT EXISTS trusted_ip_login_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS trusted_ip_login_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE accounts ALTER COLUMN trusted_ip_login_enabled SET DEFAULT TRUE;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS trusted_ip_login_opt_out BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS captcha_tokens (
     token       VARCHAR(64) NOT NULL PRIMARY KEY,
