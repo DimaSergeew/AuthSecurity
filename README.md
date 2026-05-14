@@ -24,8 +24,6 @@
 | 🗄 | **H2 / MariaDB** | HikariCP + prepared statements из `.sql` ресурсов. |
 | 🌐 | **IP-лимит** | Макс. N одновременных аккаунтов с одного IP. |
 | ⏳ | **Trusted sessions** | Повторный вход с того же IP в течение TTL — без диалога. |
-| 🚫 | **Account lockout** | Блокировка по UUID после N неудач — **переживает реконнект**. |
-| 💤 | **Idle kick** | Кик авторизованного игрока после бездействия (движение/чат/команды). |
 | 🅰 | **Password policy** | Опционально: обязательна буква + цифра. |
 | 🔡 | **Case-sensitive login** | Регистр логина проверяется — «другой регистр» вежливо отклоняется. |
 | 🚪 | **Force logout** | Админ может разлогинить игрока и инвалидировать trusted-сессию. |
@@ -100,15 +98,6 @@ security:
   password-max-length: 72
   accounts-per-ip-limit: 3      # одновременных аккаунтов с IP
 
-  lockout:                      # persistent lockout (переживает реконнект)
-    enabled: true
-    max-attempts: 5
-    ban-minutes: 15
-
-  idle-logout:                  # кик за бездействие
-    enabled: false
-    minutes: 30
-
   password-policy:
     require-letter-and-digit: false
 
@@ -157,9 +146,12 @@ IP trusted?    IP limit hit?   Locked out?   Username case OK?
         Argon2 verify             disconnect       inline dialog
        /         \                                  (Discord URL)
       ✓           ✗
-      │       LockoutTracker++
+      │           │
+      ▼           ▼
+ complete(future)  retry / kick after max-attempts
+      │
       ▼
- complete(future) → IdleWatcher arm → player enters world
+ player enters world
 ```
 
 ---
@@ -177,9 +169,7 @@ src/main/java/me/bedepay/authsecurity
 │   ├── PendingSession.java        — record ожидающей сессии
 │   ├── AuthResult.java            — record результата
 │   ├── PasswordHasher.java        — Argon2id wrapper
-│   ├── PasswordPolicy.java        — общие правила паролей
-│   ├── LockoutTracker.java        — persistent brute-force lockout
-│   └── IdleWatcher.java           — idle-kick (listener + async sweeper)
+│   └── PasswordPolicy.java        — общие правила паролей
 ├── commands/
 │   ├── AuthCommands.java          — /unregister, /changepassword, /accountinfo
 │   └── AdminCommands.java         — /authsecurity reload · logout

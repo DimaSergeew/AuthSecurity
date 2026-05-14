@@ -41,23 +41,10 @@ public record PluginConfig(
             int passwordMaxLength,
             int accountsPerIpLimit,
             int maxConcurrentAuthSessions,
-            LockoutConfig lockout,
-            IdleLogoutConfig idleLogout,
             PasswordPolicyConfig passwordPolicy
     ) {
         public boolean sessionTrustEnabled() { return sessionTtlMinutes > 0; }
     }
-
-    public record LockoutConfig(
-            boolean enabled,
-            int maxAttempts,
-            long banMinutes
-    ) {}
-
-    public record IdleLogoutConfig(
-            boolean enabled,
-            long minutes
-    ) {}
 
     public record PasswordPolicyConfig(
             boolean requireLetterAndDigit

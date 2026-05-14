@@ -121,15 +121,6 @@ public final class CaptchaService {
         verifyCallbacks.remove(token);
     }
 
-    public boolean isVerified(String token) {
-        try {
-            return accounts.isCaptchaVerified(token);
-        } catch (SQLException e) {
-            plugin.getSLF4JLogger().warn("DB error reading captcha verified flag", e);
-            return false;
-        }
-    }
-
     /**
      * Calls Cloudflare's siteverify asynchronously and, on success, marks the token verified
      * in the DB. The returned future never completes exceptionally — failures (network, bad

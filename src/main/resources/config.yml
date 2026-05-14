@@ -1,4 +1,4 @@
-config-version: 4
+config-version: 6
 
 database:
   # Accepted values: "h2" or "mariadb"
@@ -33,20 +33,6 @@ security:
   # Maximum number of players that may wait on the login/register dialog at the same time.
   # Set to 0 to disable the limit.
   max-concurrent-auth-sessions: 100
-
-  # Persistent per-IP lockout. Counts wrong-password attempts by source address so an
-  # attacker can't lock out a victim's account by failing its password — only their
-  # own IP gets banned. Survives reconnects within a server session.
-  lockout:
-    enabled: false
-    max-attempts: 5
-    ban-minutes: 15
-
-  # Kick authenticated players who have been idle (no movement/chat/commands) for too long.
-  # They'll be asked to log in again on the next connect.
-  idle-logout:
-    enabled: false
-    minutes: 30
 
   # Optional password complexity requirements (applied to registration and password change).
   password-policy:
@@ -153,10 +139,8 @@ messages:
   passwords-mismatch: "<red>Пароли не совпадают.</red>"
   uuid-missing: "<red>Не удалось определить ваш UUID.</red>"
   ip-limit-reached: "<red>С вашего IP уже подключено слишком много аккаунтов (лимит: <limit>).</red>"
-  account-locked: "<red>Слишком много неверных попыток. Вход заблокирован на <minutes> мин.</red>"
   wrong-username-case: "<red>Ваш ник зарегистрирован как '<correct>'. Перезайдите с правильным регистром.</red>"
   name-already-registered: "<red>Ник '<name>' уже привязан к другому аккаунту. Обратитесь к администратору.</red>"
-  idle-kick: "<yellow>Вы были отключены за бездействие. Войдите снова.</yellow>"
   password-requires-alphanumeric: "<red>Пароль должен содержать хотя бы одну букву и одну цифру.</red>"
 
   forgot-password-title: "<gold>🔑 Восстановление доступа</gold>"
@@ -187,7 +171,6 @@ messages:
   command-trustip-enabled: "<green>Быстрый вход с этого IP включен для вашего аккаунта.</green>"
   command-trustip-disabled: "<yellow>Быстрый вход с этого IP отключен для вашего аккаунта.</yellow>"
   command-trustip-unavailable: "<red>Быстрый вход по IP отключен администратором сервера.</red>"
-  trusted-ip-login-hint: "<gray>Быстрый вход с этого IP включен на <yellow><minutes> минут</yellow>. Для повышения безопасности вы можете отключить его командой <yellow>/authsecurity trustip off</yellow>.</gray>"
   admin-password-changed-kick: "<yellow>Ваш пароль был изменен администратором. Пожалуйста, перезайдите на сервер.</yellow>"
   admin-account-unregistered-kick: "<yellow>Ваш аккаунт был удален администратором. Пожалуйста, перезайдите на сервер.</yellow>"
 

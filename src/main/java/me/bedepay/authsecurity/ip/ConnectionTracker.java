@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Counts distinct player UUIDs currently connected from the same IP address.
@@ -18,18 +19,18 @@ public final class ConnectionTracker {
 
     public boolean tryAcquire(String ip, UUID uuid, int limit) {
         if (ip == null) return true;
-        final boolean[] accepted = {false};
+        AtomicBoolean accepted = new AtomicBoolean(false);
         byIp.compute(ip, (key, existing) -> {
             Set<UUID> set = existing != null ? existing : Collections.synchronizedSet(new HashSet<>());
             synchronized (set) {
-                if (set.contains(uuid)) { accepted[0] = true; return set; }
-                if (set.size() >= limit) { accepted[0] = false; return set; }
+                if (set.contains(uuid)) { accepted.set(true); return set; }
+                if (set.size() >= limit) { accepted.set(false); return set; }
                 set.add(uuid);
-                accepted[0] = true;
+                accepted.set(true);
                 return set;
             }
         });
-        return accepted[0];
+        return accepted.get();
     }
 
     public void release(String ip, UUID uuid) {

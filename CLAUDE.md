@@ -12,8 +12,6 @@ Code is split across small focused classes under `me.bedepay.authsecurity`:
 - `auth/AuthFlow` — the configuration-phase gate + dialog click handler.
 - `auth/PasswordHasher` — Argon2id wrapper (parameters are fixed).
 - `auth/PasswordPolicy` — shared password rules (length + optional letter+digit).
-- `auth/LockoutTracker` — per-account brute-force lockout surviving reconnects.
-- `auth/IdleWatcher` — activity-based idle kick (event listener + async sweeper).
 - `auth/PendingSession` / `auth/AuthResult` — immutable value types.
 - `commands/AuthCommands` — `/unregister`, `/changepassword`, `/accountinfo`.
 - `commands/AdminCommands` — `/authsecurity reload`, `/authsecurity logout`.
@@ -36,7 +34,7 @@ Gradle Kotlin DSL with the `com.gradleup.shadow` plugin.
 The gate hinges on Paper's configuration-phase API (`@SuppressWarnings("UnstableApiUsage")`):
 
 1. **`AsyncPlayerConnectionConfigureEvent`** ([AuthFlow.java](src/main/java/me/bedepay/authsecurity/auth/AuthFlow.java)) fires off-thread while the player is still in the config phase. The handler **blocks on `session.future().join()`** to hold the player there until they submit the dialog. Do not move this logic to a sync event — it will deadlock the main thread.
-2. Before showing the dialog, `AuthFlow` checks `LockoutTracker.remainingLockMinutes(uuid)` and, when no account exists for this UUID, does a case-insensitive username lookup — if a different-case account already owns the name, the player is disconnected with the correct spelling.
+2. Before showing the dialog, when no account exists for this UUID, `AuthFlow` does a case-insensitive username lookup — if a different-case account already owns the name, the player is disconnected with the correct spelling.
 3. A `PendingSession` record is registered in the `pending` map keyed by UUID, with a `CompletableFuture<AuthResult>` that is completed by either the click handler or a `login-timeout-minutes` `completeOnTimeout`.
 4. **`PlayerCustomClickEvent`** dispatches on `Key` identifiers under the `authsecurity:` namespace (`submit/login`, `submit/register`, `submit/change-password`, `cancel`, `forgot-back`) and reads input fields from the `DialogResponseView`.
 5. On success, if `security.session-ttl-minutes > 0` and the account has not opted out with `/authsecurity trustip off`, the player's IP is stored in `trustedSessions`, and a `ScheduledTask` is recorded in `trustExpiryTasks`. New accounts default to trusted-IP fast login. On each new successful auth the previous expiry task is cancelled before the new one is scheduled (prevents the race that would otherwise delete a still-valid entry).

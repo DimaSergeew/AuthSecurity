@@ -20,7 +20,7 @@ import java.util.List;
  */
 public final class ConfigLoader {
 
-    private static final int CONFIG_VERSION = 4;
+    private static final int CONFIG_VERSION = 6;
 
     private ConfigLoader() {}
 
@@ -130,21 +130,6 @@ public final class ConfigLoader {
                 ? s.getLong("session-ttl-minutes", 30L)
                 : s.getLong("session-ttl-hours", 1L) * 60L;
 
-        ConfigurationSection lockoutSec = s.getConfigurationSection("lockout");
-        PluginConfig.LockoutConfig lockout = lockoutSec == null
-                ? new PluginConfig.LockoutConfig(false, 5, 15L)
-                : new PluginConfig.LockoutConfig(
-                        lockoutSec.getBoolean("enabled", false),
-                        lockoutSec.getInt("max-attempts", 5),
-                        lockoutSec.getLong("ban-minutes", 15L));
-
-        ConfigurationSection idleSec = s.getConfigurationSection("idle-logout");
-        PluginConfig.IdleLogoutConfig idle = idleSec == null
-                ? new PluginConfig.IdleLogoutConfig(false, 30L)
-                : new PluginConfig.IdleLogoutConfig(
-                        idleSec.getBoolean("enabled", false),
-                        idleSec.getLong("minutes", 30L));
-
         ConfigurationSection policySec = s.getConfigurationSection("password-policy");
         PluginConfig.PasswordPolicyConfig policy = policySec == null
                 ? new PluginConfig.PasswordPolicyConfig(false)
@@ -159,8 +144,6 @@ public final class ConfigLoader {
                 s.getInt("password-max-length", 72),
                 s.getInt("accounts-per-ip-limit", 3),
                 s.getInt("max-concurrent-auth-sessions", 100),
-                lockout,
-                idle,
                 policy
         );
     }
@@ -252,10 +235,8 @@ public final class ConfigLoader {
                 Messages.parse(s.getString("passwords-mismatch", "")),
                 Messages.parse(s.getString("uuid-missing", "")),
                 s.getString("ip-limit-reached", ""),
-                s.getString("account-locked", ""),
                 s.getString("wrong-username-case", ""),
                 s.getString("name-already-registered", ""),
-                Messages.parse(s.getString("idle-kick", "")),
                 Messages.parse(s.getString("password-requires-alphanumeric", "")),
                 Messages.parse(s.getString("forgot-password-title", "")),
                 Messages.parse(s.getString("forgot-password-body", "")),
@@ -283,7 +264,6 @@ public final class ConfigLoader {
                 Messages.parse(s.getString("command-trustip-enabled", "")),
                 Messages.parse(s.getString("command-trustip-disabled", "")),
                 Messages.parse(s.getString("command-trustip-unavailable", "")),
-                s.getString("trusted-ip-login-hint", ""),
                 Messages.parse(s.getString("admin-password-changed-kick", "")),
                 Messages.parse(s.getString("admin-account-unregistered-kick", "")),
                 Messages.parse(s.getString("command-reload-started", "")),
@@ -332,9 +312,6 @@ public final class ConfigLoader {
         if (sec.maxConcurrentAuthSessions() < 0) {
             errors.add("security.max-concurrent-auth-sessions must be 0 or greater");
         }
-        if (sec.lockout().maxAttempts() < 1) errors.add("security.lockout.max-attempts must be at least 1");
-        if (sec.lockout().banMinutes() < 1) errors.add("security.lockout.ban-minutes must be at least 1");
-        if (sec.idleLogout().minutes() < 1) errors.add("security.idle-logout.minutes must be at least 1");
 
         PluginConfig.CaptchaConfig captcha = c.captcha();
         if (captcha.webPort() < 1 || captcha.webPort() > 65535) {

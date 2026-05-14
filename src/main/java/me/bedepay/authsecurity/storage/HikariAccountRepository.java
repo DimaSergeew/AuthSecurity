@@ -157,17 +157,6 @@ public final class HikariAccountRepository implements AccountRepository {
     }
 
     @Override
-    public boolean isCaptchaVerified(String token) throws SQLException {
-        try (Connection c = pool.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql.isCaptchaVerified())) {
-            ps.setString(1, token);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1);
-            }
-        }
-    }
-
-    @Override
     public boolean markCaptchaVerified(String token) throws SQLException {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.markCaptchaVerified())) {
@@ -199,8 +188,7 @@ public final class HikariAccountRepository implements AccountRepository {
         try (Connection c = pool.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.updateTrustedIpLogin())) {
             ps.setBoolean(1, enabled);
-            ps.setBoolean(2, enabled);
-            ps.setString(3, uuid.toString());
+            ps.setString(2, uuid.toString());
             ps.executeUpdate();
         }
     }

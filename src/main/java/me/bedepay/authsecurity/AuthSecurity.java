@@ -2,8 +2,6 @@ package me.bedepay.authsecurity;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import me.bedepay.authsecurity.auth.AuthFlow;
-import me.bedepay.authsecurity.auth.IdleWatcher;
-import me.bedepay.authsecurity.auth.LockoutTracker;
 import me.bedepay.authsecurity.captcha.CaptchaService;
 import me.bedepay.authsecurity.captcha.CaptchaWebServer;
 import me.bedepay.authsecurity.commands.AdminCommands;
@@ -26,8 +24,6 @@ public final class AuthSecurity extends JavaPlugin {
     private AuthFlow authFlow;
     private AuthCommands authCommands;
     private AdminCommands adminCommands;
-    private LockoutTracker lockoutTracker;
-    private IdleWatcher idleWatcher;
     private CaptchaService captchaService;
     private CaptchaWebServer captchaWebServer;
 
@@ -53,8 +49,6 @@ public final class AuthSecurity extends JavaPlugin {
 
         Dialogs dialogs = new Dialogs(config.messages(), config.support());
         ConnectionTracker connectionTracker = new ConnectionTracker();
-        lockoutTracker = new LockoutTracker(config.security().lockout());
-        idleWatcher = new IdleWatcher(this, config.security().idleLogout(), config.messages());
 
         captchaService = new CaptchaService(this, accounts, config.captcha());
         if (config.captcha().enabled()) {
@@ -76,19 +70,14 @@ public final class AuthSecurity extends JavaPlugin {
         authFlow = new AuthFlow(
                 this, accounts, config.security(), config.captcha(),
                 config.messages(), dialogs,
-                connectionTracker, lockoutTracker, captchaService);
+                connectionTracker, captchaService);
         authCommands = new AuthCommands(
                 this, accounts, authFlow, config.messages(), dialogs, config.security());
         adminCommands = new AdminCommands(
                 this, accounts, authFlow, config.messages(), this::reload);
 
-        idleWatcher.bindAuthFlow(authFlow);
-        lockoutTracker.startSweeper(this);
-
         getServer().getPluginManager().registerEvents(authFlow, this);
         getServer().getPluginManager().registerEvents(authCommands, this);
-        getServer().getPluginManager().registerEvents(idleWatcher, this);
-        idleWatcher.start();
 
         PaperCommandManager<CommandSourceStack> commandManager = PaperCommandManager.builder()
                 .executionCoordinator(ExecutionCoordinator.simpleCoordinator())
@@ -102,8 +91,6 @@ public final class AuthSecurity extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (idleWatcher != null) idleWatcher.stop();
-        if (lockoutTracker != null) lockoutTracker.stopSweeper();
         if (captchaService != null) captchaService.stop();
         if (captchaWebServer != null) captchaWebServer.stop();
         if (accounts != null) accounts.close();
@@ -111,10 +98,9 @@ public final class AuthSecurity extends JavaPlugin {
 
     /**
      * Reloads the configuration from disk and swaps the live references held by
-     * {@link AuthFlow}, {@link AuthCommands}, {@link AdminCommands}, {@link LockoutTracker},
-     * and {@link IdleWatcher}. Database settings and the captcha web server are NOT reloaded —
-     * changing those requires a full server restart because they own long-lived resources
-     * (connection pool, listening port).
+     * {@link AuthFlow}, {@link AuthCommands}, and {@link AdminCommands}. Database settings
+     * and the captcha web server are NOT reloaded — changing those requires a full server
+     * restart because they own long-lived resources (connection pool, listening port).
      */
     public void reload() {
         PluginConfig config = ConfigLoader.load(this);
@@ -122,8 +108,6 @@ public final class AuthSecurity extends JavaPlugin {
         if (authFlow != null)      authFlow.applyConfig(config.security(), config.captcha(), config.messages(), dialogs);
         if (authCommands != null)  authCommands.applyConfig(config.messages(), dialogs, config.security());
         if (adminCommands != null) adminCommands.applyConfig(config.messages());
-        if (lockoutTracker != null) lockoutTracker.applyConfig(config.security().lockout());
-        if (idleWatcher != null)   idleWatcher.applyConfig(config.security().idleLogout(), config.messages());
         if (captchaService != null) captchaService.applyConfig(config.captcha());
     }
 }

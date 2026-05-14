@@ -40,10 +40,8 @@ public record Messages(
         Component uuidMissing,
         String ipLimitReached,
 
-        String accountLocked,
         String wrongUsernameCase,
         String nameAlreadyRegistered,
-        Component idleKick,
         Component passwordRequiresAlphanumeric,
 
         Component forgotPasswordTitle,
@@ -74,7 +72,6 @@ public record Messages(
         Component commandTrustIpEnabled,
         Component commandTrustIpDisabled,
         Component commandTrustIpUnavailable,
-        String trustedIpLoginHint,
         Component adminPasswordChangedKick,
         Component adminAccountUnregisteredKick,
 
@@ -127,10 +124,6 @@ public record Messages(
         return render(ipLimitReached, Placeholder.unparsed("limit", Integer.toString(limit)));
     }
 
-    public Component accountLocked(long minutesRemaining) {
-        return render(accountLocked, Placeholder.unparsed("minutes", Long.toString(minutesRemaining)));
-    }
-
     public Component wrongUsernameCase(String correctName) {
         return render(wrongUsernameCase, Placeholder.unparsed("correct", correctName));
     }
@@ -167,10 +160,6 @@ public record Messages(
         return render(commandAccountInfoLine,
                 Placeholder.unparsed("key", key),
                 Placeholder.unparsed("value", value));
-    }
-
-    public Component trustedIpLoginHint(long minutes) {
-        return render(trustedIpLoginHint, Placeholder.unparsed("minutes", Long.toString(minutes)));
     }
 
     public Component captchaWelcomeBody(String username) {

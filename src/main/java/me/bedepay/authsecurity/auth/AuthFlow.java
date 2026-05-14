@@ -19,7 +19,6 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.net.InetSocketAddress;
@@ -36,7 +35,6 @@ public final class AuthFlow implements Listener {
     private final Plugin plugin;
     private final AccountRepository accounts;
     private final ConnectionTracker connectionTracker;
-    private final LockoutTracker lockoutTracker;
     private final CaptchaService captchaService;
 
     private volatile PluginConfig.SecurityConfig security;
@@ -48,8 +46,6 @@ public final class AuthFlow implements Listener {
     private final Map<UUID, String> trustedSessions = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledTask> trustExpiryTasks = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
-    private final java.util.Set<UUID> trustHintPending = ConcurrentHashMap.newKeySet();
-    private final java.util.Set<UUID> trustHintShownThisRun = ConcurrentHashMap.newKeySet();
     private final java.util.concurrent.atomic.AtomicInteger captchaInflight =
             new java.util.concurrent.atomic.AtomicInteger();
     private final java.util.concurrent.atomic.AtomicInteger authInflight =
@@ -62,7 +58,6 @@ public final class AuthFlow implements Listener {
                     Messages messages,
                     Dialogs dialogs,
                     ConnectionTracker connectionTracker,
-                    LockoutTracker lockoutTracker,
                     CaptchaService captchaService) {
         this.plugin = plugin;
         this.accounts = accounts;
@@ -71,7 +66,6 @@ public final class AuthFlow implements Listener {
         this.messages = messages;
         this.dialogs = dialogs;
         this.connectionTracker = connectionTracker;
-        this.lockoutTracker = lockoutTracker;
         this.captchaService = captchaService;
     }
 
@@ -96,7 +90,6 @@ public final class AuthFlow implements Listener {
     public void invalidate(UUID uuid) {
         trustedSessions.remove(uuid);
         authenticated.remove(uuid);
-        trustHintPending.remove(uuid);
         ScheduledTask task = trustExpiryTasks.remove(uuid);
         if (task != null) task.cancel();
     }
@@ -135,15 +128,6 @@ public final class AuthFlow implements Listener {
         if (!connectionTracker.tryAcquire(ip, uuid, security.accountsPerIpLimit())) {
             conn.disconnect(messages.ipLimitReached(security.accountsPerIpLimit()));
             return;
-        }
-
-        if (ip != null) {
-            long lockMinutes = lockoutTracker.remainingLockMinutes(ip);
-            if (lockMinutes > 0) {
-                connectionTracker.release(ip, uuid);
-                conn.disconnect(messages.accountLocked(lockMinutes));
-                return;
-            }
         }
 
         String username = conn.getProfile().getName();
@@ -219,7 +203,7 @@ public final class AuthFlow implements Listener {
                 }
                 String url = buildCaptchaUrl(token);
 
-                PendingSession captchaSession = PendingSession.forCaptcha(username, ip, token, !welcome);
+                PendingSession captchaSession = PendingSession.forCaptcha(username, ip, token);
                 captchaSession.future().completeOnTimeout(
                         AuthResult.denied(messages.loginTimedOut()),
                         Math.max(1, captchaConfig.tokenTtlMinutes()),
@@ -293,9 +277,6 @@ public final class AuthFlow implements Listener {
                     && ip != null) {
                 trustedSessions.put(uuid, ip);
                 scheduleTrustExpiry(uuid);
-                if (trustHintShownThisRun.add(uuid)) {
-                    trustHintPending.add(uuid);
-                }
             }
             try {
                 accounts.updateLastIp(uuid, ip);
@@ -372,14 +353,6 @@ public final class AuthFlow implements Listener {
         connectionTracker.release(ip, uuid);
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        UUID uuid = event.getPlayer().getUniqueId();
-        if (!trustHintPending.remove(uuid)) return;
-        if (!security.sessionTrustEnabled()) return;
-        event.getPlayer().sendMessage(messages.trustedIpLoginHint(security.sessionTtlMinutes()));
-    }
-
     /**
      * Atomically install {@code session} as the pending entry for {@code uuid}, completing
      * any previously parked session's future so its configure thread can unwind. Without this
@@ -441,15 +414,6 @@ public final class AuthFlow implements Listener {
     private void handleLogin(UUID uuid, PendingSession session, Audience audience, String password) {
         if (PasswordHasher.verify(password, session.hash())) {
             session.future().complete(AuthResult.allowed());
-            return;
-        }
-
-        boolean locked = session.ip() != null && lockoutTracker.recordFailure(session.ip());
-        if (locked) {
-            long remaining = session.ip() != null ? lockoutTracker.remainingLockMinutes(session.ip()) : 0;
-            plugin.getSLF4JLogger().info("IP locked after repeated failures: {} ({}) from {}",
-                    session.username(), uuid, session.ip());
-            session.future().complete(AuthResult.denied(messages.accountLocked(remaining)));
             return;
         }
 
