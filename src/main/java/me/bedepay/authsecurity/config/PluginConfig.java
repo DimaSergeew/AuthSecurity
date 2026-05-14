@@ -64,7 +64,20 @@ public record PluginConfig(
             boolean refreshVerificationOnLogin,
             boolean revalidateOnIpChange,
             int maxConcurrentChallenges,
+            int maxAttemptsPerToken,
+            IpBlockConfig ipBlock,
             CaptchaWebTexts webTexts
+    ) {}
+
+    /**
+     * Temporary per-IP block applied after repeated Cloudflare-rejected /verify calls.
+     * Only real "captcha was wrong" rejections count — network and DB errors do not,
+     * so legitimate players on flaky connections are not penalised.
+     */
+    public record IpBlockConfig(
+            boolean enabled,
+            int maxFailures,
+            int blockDurationMinutes
     ) {}
 
     /**
@@ -84,6 +97,9 @@ public record PluginConfig(
             String statusVerified,
             String statusFailed,
             String statusNetwork,
-            String statusWidgetError
+            String statusWidgetError,
+            String statusVerifiedClosing,
+            String statusVerifiedDone,
+            int autoCloseSecs
     ) {}
 }

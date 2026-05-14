@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 /**
@@ -47,6 +48,22 @@ public final class CaptchaService {
      * having to come back into Minecraft and click anything.
      */
     private final Map<String, Runnable> verifyCallbacks = new ConcurrentHashMap<>();
+
+    /**
+     * Per-token attempt counter. Limits how many times a single token can be hammered
+     * against /verify before further attempts short-circuit to REJECTED. Cleared on
+     * a successful verification or when the waiter is cancelled (timeout, disconnect).
+     */
+    private final Map<String, AtomicInteger> tokenAttempts = new ConcurrentHashMap<>();
+
+    /**
+     * Token → (uuid, username) so /verify outcomes can be logged with player identity
+     * instead of an opaque token. Populated by {@link #issueToken}, removed on success
+     * or {@link #cancelWaiter}.
+     */
+    private final Map<String, TokenIdentity> tokenIdentities = new ConcurrentHashMap<>();
+
+    public record TokenIdentity(UUID uuid, String username) {}
 
     public CaptchaService(Plugin plugin, AccountRepository accounts, PluginConfig.CaptchaConfig config) {
         this.plugin = plugin;
@@ -97,6 +114,7 @@ public final class CaptchaService {
         long ttlSeconds = TimeUnit.MINUTES.toSeconds(Math.max(1, config.tokenTtlMinutes()));
         try {
             accounts.insertCaptchaToken(token, uuid, username, ttlSeconds);
+            tokenIdentities.put(token, new TokenIdentity(uuid, username));
             return token;
         } catch (SQLException e) {
             plugin.getSLF4JLogger().error("Failed to insert captcha token for {}", uuid, e);
@@ -119,20 +137,37 @@ public final class CaptchaService {
     public void cancelWaiter(String token) {
         if (token == null) return;
         verifyCallbacks.remove(token);
+        tokenAttempts.remove(token);
+        tokenIdentities.remove(token);
     }
 
     /**
      * Calls Cloudflare's siteverify asynchronously and, on success, marks the token verified
-     * in the DB. The returned future never completes exceptionally — failures (network, bad
-     * response, DB error) resolve to {@code false}.
+     * in the DB. The returned future never completes exceptionally — outcomes are signalled
+     * via {@link VerificationOutcome}:
+     * <ul>
+     *   <li>{@code SUCCESS}  — Cloudflare confirmed and DB row updated.</li>
+     *   <li>{@code REJECTED} — Cloudflare returned success:false, or the token exceeded
+     *       its per-token attempt cap. Caller should count this against rate-limit thresholds.</li>
+     *   <li>{@code ERROR}    — network, HTTP, or DB error. Player should not be penalised.</li>
+     * </ul>
      *
      * Async on purpose: this is invoked from the captcha web server's HTTP handler, and a
      * synchronous send would block a Jetty worker for up to {@code timeout} per request,
      * making the gate easy to DoS by hammering /verify with junk responses.
      */
-    public CompletableFuture<Boolean> markVerified(String token, String cfResponse) {
+    public CompletableFuture<VerificationOutcome> markVerified(String token, String cfResponse) {
         if (token == null || token.isBlank() || cfResponse == null || cfResponse.isBlank()) {
-            return CompletableFuture.completedFuture(false);
+            return CompletableFuture.completedFuture(VerificationOutcome.REJECTED);
+        }
+        TokenIdentity who = tokenIdentities.get(token);
+        int max = Math.max(1, config.maxAttemptsPerToken());
+        int attempts = tokenAttempts.computeIfAbsent(token, k -> new AtomicInteger()).incrementAndGet();
+        if (attempts > max) {
+            plugin.getSLF4JLogger().info(
+                    "Captcha REJECTED for {}: token exceeded max-attempts-per-token ({})",
+                    who(who), max);
+            return CompletableFuture.completedFuture(VerificationOutcome.REJECTED);
         }
         String form = "secret=" + enc(config.secretKey())
                 + "&response=" + enc(cfResponse);
@@ -144,39 +179,56 @@ public final class CaptchaService {
         return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
                 .handle((resp, err) -> {
                     if (err != null) {
-                        plugin.getSLF4JLogger().warn("Turnstile siteverify call failed", err);
-                        return false;
+                        plugin.getSLF4JLogger().warn("Captcha ERROR for {}: siteverify call failed", who(who), err);
+                        return VerificationOutcome.ERROR;
                     }
                     if (resp.statusCode() != 200) {
-                        plugin.getSLF4JLogger().warn("Turnstile siteverify returned HTTP {}", resp.statusCode());
-                        return false;
+                        plugin.getSLF4JLogger().warn(
+                                "Captcha ERROR for {}: siteverify returned HTTP {}",
+                                who(who), resp.statusCode());
+                        return VerificationOutcome.ERROR;
                     }
                     String body = resp.body();
-                    boolean success = body != null && SUCCESS_REGEX.matcher(body).find();
-                    if (!success) {
-                        plugin.getSLF4JLogger().info("Turnstile rejected response: {}", body);
-                        return false;
+                    boolean cloudflareOk = body != null && SUCCESS_REGEX.matcher(body).find();
+                    if (!cloudflareOk) {
+                        plugin.getSLF4JLogger().info(
+                                "Captcha REJECTED for {} by Cloudflare: {}",
+                                who(who), body);
+                        return VerificationOutcome.REJECTED;
                     }
                     try {
                         boolean updated = accounts.markCaptchaVerified(token);
                         if (updated) {
+                            tokenAttempts.remove(token);
+                            tokenIdentities.remove(token);
                             Runnable cb = verifyCallbacks.remove(token);
                             if (cb != null) {
                                 try {
                                     cb.run();
                                 } catch (Exception cbErr) {
-                                    plugin.getSLF4JLogger().warn("Captcha verify callback failed for token", cbErr);
+                                    plugin.getSLF4JLogger().warn(
+                                            "Captcha verify callback failed for {}", who(who), cbErr);
                                 }
                             }
-                        } else {
-                            plugin.getSLF4JLogger().info("Captcha verify for token had no effect (expired or missing)");
+                            plugin.getSLF4JLogger().info("Captcha SUCCESS for {}", who(who));
+                            return VerificationOutcome.SUCCESS;
                         }
-                        return updated;
+                        // DB returned 0 rows updated — token expired or absent. Don't punish the player.
+                        plugin.getSLF4JLogger().info(
+                                "Captcha verify for {} had no effect (token expired or already consumed)",
+                                who(who));
+                        return VerificationOutcome.ERROR;
                     } catch (SQLException dbErr) {
-                        plugin.getSLF4JLogger().warn("DB error while marking captcha verified", dbErr);
-                        return false;
+                        plugin.getSLF4JLogger().warn(
+                                "Captcha ERROR for {}: DB failure while marking verified",
+                                who(who), dbErr);
+                        return VerificationOutcome.ERROR;
                     }
                 });
+    }
+
+    private static String who(TokenIdentity id) {
+        return id == null ? "unknown-token" : id.username() + " (" + id.uuid() + ")";
     }
 
     private static String enc(String value) {

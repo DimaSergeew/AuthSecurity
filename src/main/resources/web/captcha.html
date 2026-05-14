@@ -178,6 +178,38 @@
         #status.err  { color: var(--red);   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
         #status.busy { color: var(--gold); }
 
+        #success-block {
+            display: none;
+            text-align: center;
+            padding-top: 8px;
+        }
+        .check-anim {
+            display: block;
+            font-size: 72px;
+            color: var(--green);
+            text-shadow: 0 0 32px rgba(107, 255, 142, 0.6);
+            animation: pop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) both;
+            margin-bottom: 14px;
+        }
+        @keyframes pop {
+            0%   { transform: scale(0); opacity: 0; }
+            70%  { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .success-heading {
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--green);
+            text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+            line-height: 1.8;
+            margin-bottom: 16px;
+            white-space: pre-line;
+        }
+        .countdown-text {
+            font-size: 20px;
+            color: var(--text-dim);
+        }
+
         .hint {
             font-size: 18px;
             color: var(--text-dim);
@@ -217,9 +249,15 @@
         <h1>{{heading}}</h1>
         <p>{{introHtml}}</p>
 
-        <div class="cf-turnstile" data-sitekey="{{siteKey}}" data-callback="onOk" data-error-callback="onErr"></div>
+        <div class="cf-turnstile" data-sitekey="{{siteKey}}" data-callback="onOk" data-error-callback="onErr" data-theme="dark"></div>
 
         <div id="status">&nbsp;</div>
+
+        <div id="success-block">
+            <span class="check-anim">✓</span>
+            <div class="success-heading" id="success-msg"></div>
+            <div class="countdown-text" id="countdown-el"></div>
+        </div>
 
         <p class="hint">{{hint}}</p>
         <div class="footer">{{footer}}</div>
@@ -243,13 +281,43 @@
             body: JSON.stringify({ token: TOKEN, cfResponse: cfToken })
         }).then(function (r) {
             if (r.ok) {
-                setStatus(I18N.verified, "ok");
+                showSuccess();
             } else {
                 setStatus(I18N.failed, "err");
             }
         }).catch(function () {
             setStatus(I18N.network, "err");
         });
+    }
+
+    function showSuccess() {
+        var widget = document.querySelector(".cf-turnstile");
+        if (widget) widget.style.display = "none";
+        setStatus(" ", "");
+        document.getElementById("success-msg").textContent = I18N.verified;
+        document.getElementById("success-block").style.display = "block";
+        startCountdown(I18N.autoCloseSecs || 5);
+    }
+
+    function startCountdown(secs) {
+        var el = document.getElementById("countdown-el");
+        var remaining = secs;
+        function tick() {
+            if (remaining <= 0) {
+                el.textContent = "";
+                window.close();
+                setTimeout(function () {
+                    if (!window.closed) {
+                        el.textContent = I18N.closeManually;
+                    }
+                }, 300);
+                return;
+            }
+            el.textContent = I18N.closingIn.replace("{secs}", remaining);
+            remaining--;
+            setTimeout(tick, 1000);
+        }
+        tick();
     }
 
     function onErr() {

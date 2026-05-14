@@ -173,6 +173,8 @@ public final class AuthFlow implements Listener {
             // Renew the TTL so the trusted entry doesn't disappear mid-session if the
             // player reconnected close to expiry.
             scheduleTrustExpiry(uuid);
+            plugin.getSLF4JLogger().info("Trusted-IP fast login: {} ({}) from {}",
+                    account.username(), uuid, ip);
             return;
         }
 
@@ -217,6 +219,10 @@ public final class AuthFlow implements Listener {
                 captchaService.registerWaiter(token,
                         () -> captchaSession.future().complete(AuthResult.allowed()));
 
+                plugin.getSLF4JLogger().info(
+                        "Captcha challenge issued: {} ({}) from {} [{}]",
+                        username, uuid, ip, welcome ? "new player" : "returning");
+
                 conn.getAudience().showDialog(dialogs.captcha(url, username, welcome, null));
 
                 AuthResult captchaResult;
@@ -228,6 +234,9 @@ public final class AuthFlow implements Listener {
                 }
 
                 if (!captchaResult.ok()) {
+                    plugin.getSLF4JLogger().info(
+                            "Captcha gate denied: {} ({}) from {} (timed out, cancelled, or session replaced)",
+                            username, uuid, ip);
                     connectionTracker.release(ip, uuid);
                     closeDialogAndDisconnect(conn, captchaResult.disconnectReason());
                     return;

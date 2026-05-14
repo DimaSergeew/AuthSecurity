@@ -87,6 +87,25 @@ captcha:
   # to disable the limit (not recommended on a public server).
   max-concurrent-challenges: 50
 
+  # Maximum number of /verify attempts allowed against a single token. After this is
+  # exceeded the token short-circuits to REJECTED without ever calling Cloudflare —
+  # which stops one issued token being used to burn through your Cloudflare quota.
+  # Reasonable values: 3-10. Legitimate players should never hit this.
+  max-attempts-per-token: 5
+
+  # Temporary per-IP block applied after repeated Cloudflare-rejected /verify calls.
+  # Only real "captcha was wrong" rejections count — network/HTTP/DB errors do NOT
+  # count, so a player on flaky internet won't be blocked. A single successful
+  # verification immediately clears the IP's counter.
+  # While blocked, both GET /c/{token} and POST /verify return 429 from this IP.
+  ip-block:
+    enabled: true
+    # How many failures before the block kicks in.
+    max-failures: 3
+    # How long the block lasts. Keep this short (5-15 min) so legitimate players
+    # caught by a flake don't suffer long penalties.
+    block-duration-minutes: 10
+
   # Texts rendered into the captcha web page (https://<your-host>/c/<token>).
   # Plain text (NOT MiniMessage). Use YAML block scalar "|-" for multi-line
   # status messages — real newlines become line breaks on the page.
@@ -103,10 +122,10 @@ captcha:
     hint: "Если виджет не загрузился, проверьте, что включен JavaScript и доступен Cloudflare."
     footer: "© PinkyFoxy · Проверка Cloudflare Turnstile"
     status-verifying: "Проверяем..."
-    status-verified: |-
-      ПРОВЕРКА ПРОЙДЕНА!
-      Вкладку можно закрыть и вернуться в Minecraft.
-      Окно входа появится автоматически.
+    status-verified: "✅ ПРОВЕРКА ПРОЙДЕНА!\nВернитесь в Minecraft — вход продолжится автоматически."
+    auto-close-secs: 5
+    status-verified-closing: "Закрываем через {secs} сек..."
+    status-verified-done: "Вкладку можно закрыть вручную."
     status-failed: |-
       Проверка не пройдена.
       Попробуйте еще раз.

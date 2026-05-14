@@ -21,12 +21,14 @@ public final class CaptchaWebServer {
 
     private final Plugin plugin;
     private final CaptchaService captcha;
+    private final IpFailureTracker failures;
     private final String htmlTemplate;
     private Javalin app;
 
-    public CaptchaWebServer(Plugin plugin, CaptchaService captcha) {
+    public CaptchaWebServer(Plugin plugin, CaptchaService captcha, IpFailureTracker failures) {
         this.plugin = plugin;
         this.captcha = captcha;
+        this.failures = failures;
         this.htmlTemplate = loadTemplate();
     }
 
@@ -43,10 +45,22 @@ public final class CaptchaWebServer {
                 // server log doesn't become a list of valid tokens any log-shipper can mine
                 // within token-ttl-minutes.
                 String path = ctx.path();
+                int status = ctx.status().getCode();
+                // The captcha web port is necessarily exposed publicly, so it gets hit by
+                // mass vulnerability scanners (/.env, /.git/config, /swagger-ui.html, ...).
+                // Their requests always 404 because no such routes exist — drop them so the
+                // console isn't flooded. Real captcha traffic only hits /c/{token} and /verify.
+                boolean known = path.equals("/") || path.equals("/verify") || path.startsWith("/c/");
+                if (!known || status == 404) {
+                    plugin.getSLF4JLogger().debug(
+                            "captcha-web {} \"{} {}\" {} {}ms",
+                            ctx.ip(), ctx.method(), path, status, ms.longValue());
+                    return;
+                }
                 if (path.startsWith("/c/")) path = "/c/[redacted]";
                 plugin.getSLF4JLogger().info(
                         "captcha-web {} \"{} {}\" {} {}ms",
-                        ctx.ip(), ctx.method(), path, ctx.status().getCode(), ms.longValue());
+                        ctx.ip(), ctx.method(), path, status, ms.longValue());
             });
         });
         app.get("/", ctx -> ctx.result("AuthSecurity captcha gate OK"));
@@ -64,6 +78,10 @@ public final class CaptchaWebServer {
     }
 
     private void serveWidget(Context ctx) {
+        if (failures.isBlocked(ctx.ip())) {
+            ctx.status(HttpStatus.TOO_MANY_REQUESTS).result("ip temporarily blocked");
+            return;
+        }
         String token = ctx.pathParam("token");
         if (!TOKEN_REGEX.matcher(token).matches()) {
             ctx.status(HttpStatus.BAD_REQUEST).result("Invalid token");
@@ -93,6 +111,11 @@ public final class CaptchaWebServer {
     }
 
     private void handleVerify(Context ctx) {
+        String ip = ctx.ip();
+        if (failures.isBlocked(ip)) {
+            ctx.status(HttpStatus.TOO_MANY_REQUESTS).result("ip temporarily blocked");
+            return;
+        }
         String body = ctx.body();
         String token = jsonField(body, "token");
         String cfResponse = jsonField(body, "cfResponse");
@@ -107,11 +130,17 @@ public final class CaptchaWebServer {
         // Async: releases the Jetty worker thread while we wait on Cloudflare's siteverify
         // (up to 10s). Without this, a flood of /verify with junk responses would saturate
         // the worker pool and starve legitimate requests.
-        ctx.future(() -> captcha.markVerified(token, cfResponse).thenAccept(ok -> {
-            if (ok) {
-                ctx.status(HttpStatus.OK).result("ok");
-            } else {
-                ctx.status(HttpStatus.BAD_REQUEST).result("verification failed");
+        ctx.future(() -> captcha.markVerified(token, cfResponse).thenAccept(outcome -> {
+            switch (outcome) {
+                case SUCCESS -> {
+                    failures.recordSuccess(ip);
+                    ctx.status(HttpStatus.OK).result("ok");
+                }
+                case REJECTED -> {
+                    failures.recordFailure(ip);
+                    ctx.status(HttpStatus.BAD_REQUEST).result("verification failed");
+                }
+                case ERROR -> ctx.status(HttpStatus.BAD_GATEWAY).result("verification error");
             }
         }));
     }
@@ -151,7 +180,10 @@ public final class CaptchaWebServer {
         sb.append("\"verified\":").append(jsonString(t.statusVerified())).append(',');
         sb.append("\"failed\":").append(jsonString(t.statusFailed())).append(',');
         sb.append("\"network\":").append(jsonString(t.statusNetwork())).append(',');
-        sb.append("\"widgetError\":").append(jsonString(t.statusWidgetError()));
+        sb.append("\"widgetError\":").append(jsonString(t.statusWidgetError())).append(',');
+        sb.append("\"closingIn\":").append(jsonString(t.statusVerifiedClosing())).append(',');
+        sb.append("\"closeManually\":").append(jsonString(t.statusVerifiedDone())).append(',');
+        sb.append("\"autoCloseSecs\":").append(t.autoCloseSecs());
         sb.append('}');
         return sb.toString();
     }

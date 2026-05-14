@@ -4,6 +4,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import me.bedepay.authsecurity.auth.AuthFlow;
 import me.bedepay.authsecurity.captcha.CaptchaService;
 import me.bedepay.authsecurity.captcha.CaptchaWebServer;
+import me.bedepay.authsecurity.captcha.IpFailureTracker;
 import me.bedepay.authsecurity.commands.AdminCommands;
 import me.bedepay.authsecurity.commands.AuthCommands;
 import me.bedepay.authsecurity.config.ConfigLoader;
@@ -26,9 +27,12 @@ public final class AuthSecurity extends JavaPlugin {
     private AdminCommands adminCommands;
     private CaptchaService captchaService;
     private CaptchaWebServer captchaWebServer;
+    private IpFailureTracker captchaFailures;
 
     @Override
     public void onEnable() {
+        saveResource("README.md", false);
+
         PluginConfig config;
         try {
             config = ConfigLoader.load(this);
@@ -51,11 +55,13 @@ public final class AuthSecurity extends JavaPlugin {
         ConnectionTracker connectionTracker = new ConnectionTracker();
 
         captchaService = new CaptchaService(this, accounts, config.captcha());
+        captchaFailures = new IpFailureTracker(this, config.captcha().ipBlock());
         if (config.captcha().enabled()) {
             try {
-                captchaWebServer = new CaptchaWebServer(this, captchaService);
+                captchaWebServer = new CaptchaWebServer(this, captchaService, captchaFailures);
                 captchaWebServer.start();
                 captchaService.startCleanup();
+                captchaFailures.startCleanup();
             } catch (Exception e) {
                 getSLF4JLogger().error("""
                         Fatal: captcha is enabled, but the captcha web server failed to start.
@@ -92,6 +98,7 @@ public final class AuthSecurity extends JavaPlugin {
     @Override
     public void onDisable() {
         if (captchaService != null) captchaService.stop();
+        if (captchaFailures != null) captchaFailures.stop();
         if (captchaWebServer != null) captchaWebServer.stop();
         if (accounts != null) accounts.close();
     }
@@ -109,5 +116,6 @@ public final class AuthSecurity extends JavaPlugin {
         if (authCommands != null)  authCommands.applyConfig(config.messages(), dialogs, config.security());
         if (adminCommands != null) adminCommands.applyConfig(config.messages());
         if (captchaService != null) captchaService.applyConfig(config.captcha());
+        if (captchaFailures != null) captchaFailures.applyConfig(config.captcha().ipBlock());
     }
 }

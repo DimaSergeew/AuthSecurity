@@ -156,7 +156,8 @@ public final class ConfigLoader {
         if (s == null) {
             return new PluginConfig.CaptchaConfig(
                     false, "", "", "0.0.0.0", 25590, "",
-                    10, 7, false, true, 50, defaultWebTexts());
+                    10, 7, false, true, 50, 5,
+                    defaultIpBlock(), defaultWebTexts());
         }
         return new PluginConfig.CaptchaConfig(
                 s.getBoolean("enabled", false),
@@ -170,7 +171,23 @@ public final class ConfigLoader {
                 s.getBoolean("refresh-verification-on-login", false),
                 s.getBoolean("revalidate-on-ip-change", true),
                 s.getInt("max-concurrent-challenges", 50),
+                s.getInt("max-attempts-per-token", 5),
+                readIpBlock(s.getConfigurationSection("ip-block")),
                 readWebTexts(s.getConfigurationSection("web-texts"))
+        );
+    }
+
+    private static PluginConfig.IpBlockConfig defaultIpBlock() {
+        return new PluginConfig.IpBlockConfig(true, 3, 10);
+    }
+
+    private static PluginConfig.IpBlockConfig readIpBlock(ConfigurationSection s) {
+        PluginConfig.IpBlockConfig d = defaultIpBlock();
+        if (s == null) return d;
+        return new PluginConfig.IpBlockConfig(
+                s.getBoolean("enabled", d.enabled()),
+                s.getInt("max-failures", d.maxFailures()),
+                s.getInt("block-duration-minutes", d.blockDurationMinutes())
         );
     }
 
@@ -185,10 +202,13 @@ public final class ConfigLoader {
                 "Если виджет не загрузился, проверьте, что включен JavaScript и доступен Cloudflare.",
                 "© PinkyFoxy · Проверка Cloudflare Turnstile",
                 "Проверяем...",
-                "ПРОВЕРКА ПРОЙДЕНА!\nВкладку можно закрыть и вернуться в Minecraft.\nОкно входа появится автоматически.",
+                "✅ ПРОВЕРКА ПРОЙДЕНА!\nВернитесь в Minecraft — вход продолжится автоматически.",
                 "Проверка не пройдена.\nПопробуйте еще раз.",
                 "Ошибка сети.\nПроверьте подключение и попробуйте снова.",
-                "Ошибка виджета captcha.\nОбновите страницу."
+                "Ошибка виджета captcha.\nОбновите страницу.",
+                "Закрываем через {secs} сек...",
+                "Вкладку можно закрыть вручную.",
+                5
         );
     }
 
@@ -208,7 +228,10 @@ public final class ConfigLoader {
                 s.getString("status-verified", d.statusVerified()),
                 s.getString("status-failed", d.statusFailed()),
                 s.getString("status-network", d.statusNetwork()),
-                s.getString("status-widget-error", d.statusWidgetError())
+                s.getString("status-widget-error", d.statusWidgetError()),
+                s.getString("status-verified-closing", d.statusVerifiedClosing()),
+                s.getString("status-verified-done", d.statusVerifiedDone()),
+                s.getInt("auto-close-secs", d.autoCloseSecs())
         );
     }
 
@@ -323,6 +346,16 @@ public final class ConfigLoader {
         }
         if (captcha.maxConcurrentChallenges() < 0) {
             errors.add("captcha.max-concurrent-challenges must be 0 or greater");
+        }
+        if (captcha.maxAttemptsPerToken() < 1) {
+            errors.add("captcha.max-attempts-per-token must be at least 1");
+        }
+        PluginConfig.IpBlockConfig ipBlock = captcha.ipBlock();
+        if (ipBlock.maxFailures() < 1) {
+            errors.add("captcha.ip-block.max-failures must be at least 1");
+        }
+        if (ipBlock.blockDurationMinutes() < 1) {
+            errors.add("captcha.ip-block.block-duration-minutes must be at least 1");
         }
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Invalid config.yml:\n - " + String.join("\n - ", errors));
